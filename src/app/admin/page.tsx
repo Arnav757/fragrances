@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/lib/auth/session";
-import { dashboardStats, ordersNeedingAction } from "@/lib/services/reports";
+import { dashboardStats, financialReport, ordersNeedingAction } from "@/lib/services/reports";
 import { adminListOrders } from "@/lib/services/admin-orders";
 import { expireStaleOrders } from "@/lib/services/orders";
 import { getAllSettings } from "@/lib/settings";
@@ -35,7 +35,14 @@ async function setupWarnings() {
 export default async function AdminHome() {
   await requireAdminPage();
   await expireStaleOrders(); // housekeeping; also available as a cron endpoint
-  const [stats, action, recent, warnings] = await Promise.all([dashboardStats(), ordersNeedingAction(), adminListOrders({}), setupWarnings()]);
+  const [stats, action, recent, warnings, money] = await Promise.all([
+    dashboardStats(),
+    ordersNeedingAction(),
+    adminListOrders({}),
+    setupWarnings(),
+    financialReport(new Date(0), new Date("9999-12-31")), // all time
+  ]);
+  const costsIncomplete = money.ordersMissingCosts > 0 || money.ordersWithEstimatedCosts > 0;
   return (
     <div>
       <PageHeader title="Overview" description="Orders, fulfilment and setup at a glance." />
@@ -60,10 +67,23 @@ export default async function AdminHome() {
         <Stat label="Pending fulfilment" value={stats.pendingFulfilment} tone={stats.pendingFulfilment ? "warning" : undefined} />
         <Stat label="Cancelled" value={stats.cancelled} />
       </div>
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Stat label="Revenue (paid, incl. GST)" value={formatINR(stats.revenue)} hint="Money received from customers. Not profit." />
-        <Stat label="Revenue excl. GST" value={formatINR(stats.revenueExTax)} hint="Taxable value of paid orders" />
-        <Stat label="Recorded supplier costs" value={formatINR(stats.recordedCosts)} hint={<Link href="/admin/reports" className="underline">See contribution in the financial report</Link>} />
+      <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Stat label="Revenue (paid, incl. GST)" value={formatINR(money.grossSalesPaise - money.refundsPaise)} hint="Received from customers, net of refunds. Not profit." />
+        <Stat label="Revenue excl. GST" value={formatINR(money.revenueExTaxPaise)} hint="Net of refunds and output GST" />
+        <Stat label="Supplier product costs" value={formatINR(money.productCostPaise + money.supplierShippingPaise)} hint="Recorded supplier purchases on paid orders, incl. shipping" />
+        <Stat label="Paid orders without costs" value={money.ordersMissingCosts} tone={money.ordersMissingCosts ? "warning" : undefined} hint="Profit below is overstated for these" />
+      </div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <Stat
+          label={costsIncomplete ? "Gross profit (estimate)" : "Gross profit"}
+          value={formatINR(money.grossProfitPaise)}
+          hint="Revenue excl. GST less supplier costs and non-recoverable GST"
+        />
+        <Stat
+          label="Estimated contribution"
+          value={formatINR(money.contributionPaise)}
+          hint={<>Gross profit less gateway fees and recorded expenses, before overheads and income tax. <Link href="/admin/reports" className="underline">Financial report</Link></>}
+        />
       </div>
 
       <div className="mt-10 grid gap-8 xl:grid-cols-2">

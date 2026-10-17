@@ -59,6 +59,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             {line("Revenue excl. GST", r.revenueExTaxPaise, { strong: true, note: `Discounts of ${formatINR(r.discountsPaise)} are already deducted` })}
             {line("Product & supplier shipping cost", r.costsExRecoverableGstPaise, { minus: true, note: `Cost basis: supplier purchases recorded on each order, excluding GST you can reclaim as ITC. Recorded total incl. GST: ${formatINR(r.productCostPaise + r.supplierShippingPaise)}` })}
             {line("Non-recoverable GST on costs", r.costGstNotRecoverablePaise, { minus: true })}
+            {line("Gross profit", r.grossProfitPaise, { strong: true, note: "Revenue excl. GST less the cost of the goods sold" })}
             {line("Payment gateway fees (incl. GST on fees)", r.paymentFeesPaise, { minus: true })}
             {line("Other expenses (advertising etc.)", r.expensesPaise, { minus: true, note: "Excluding ITC-eligible GST" })}
             {line("Estimated contribution", r.contributionPaise, { strong: true, note: "Before overheads, salaries, rent and income tax" })}

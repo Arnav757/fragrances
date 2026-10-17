@@ -17,6 +17,7 @@ export type FinancialReport = {
   costGstNotRecoverablePaise: number;
   paymentFeesPaise: number;
   expensesPaise: number;
+  grossProfitPaise: number;
   contributionPaise: number;
   ordersMissingCosts: number;
   ordersWithEstimatedCosts: number;
@@ -24,10 +25,13 @@ export type FinancialReport = {
 };
 
 /**
- * Estimated contribution before overhead and income tax:
+ * Gross profit:
  *   revenue excluding output GST (net of refunds, discounts already deducted)
  *   − product cost (supplier purchase cost, excluding GST that is ITC-eligible)
  *   − supplier shipping borne by the store
+ *   − GST on those costs that can't be reclaimed
+ * Estimated contribution before overhead and income tax:
+ *   gross profit
  *   − payment gateway fees (fee + GST on fee)
  *   − other recorded expenses (advertising etc., excluding ITC-eligible GST)
  *
@@ -82,7 +86,8 @@ export async function financialReport(from: Date, to: Date, q: Queryable = db())
   const revenueExTax = gross - tax - ref!.exTax;
   // Product + shipping cost excluding recoverable GST; non-recoverable GST added back separately.
   const productAndShipExGst = cost!.productExGst;
-  const contribution = revenueExTax - productAndShipExGst - cost!.gstNonRec - fees!.fees - exp!.amt;
+  const grossProfit = revenueExTax - productAndShipExGst - cost!.gstNonRec;
+  const contribution = grossProfit - fees!.fees - exp!.amt;
 
   return {
     from,
@@ -100,6 +105,7 @@ export async function financialReport(from: Date, to: Date, q: Queryable = db())
     costGstNotRecoverablePaise: cost!.gstNonRec,
     paymentFeesPaise: fees!.fees,
     expensesPaise: exp!.amt,
+    grossProfitPaise: Math.round(grossProfit),
     contributionPaise: Math.round(contribution),
     ordersMissingCosts: missing!.n,
     ordersWithEstimatedCosts: cost!.estimated,
@@ -113,9 +119,6 @@ export async function dashboardStats(q: Queryable = db()) {
     paid: number;
     pendingFulfilment: number;
     cancelled: number;
-    revenue: number;
-    revenueExTax: number;
-    recordedCosts: number;
     awaitingPayment: number;
   }[]>`
     select
@@ -123,9 +126,6 @@ export async function dashboardStats(q: Queryable = db()) {
       count(*) filter (where payment_status in ('paid', 'cod_collected', 'partially_refunded'))::int as paid,
       count(*) filter (where status in ('confirmed', 'awaiting_supplier_purchase', 'supplier_ordered', 'supplier_confirmed'))::int as pending_fulfilment,
       count(*) filter (where status = 'cancelled')::int as cancelled,
-      coalesce(sum(total_paise) filter (where payment_status in ('paid', 'cod_collected', 'partially_refunded')), 0)::float8 as revenue,
-      coalesce(sum(taxable_value_paise) filter (where payment_status in ('paid', 'cod_collected', 'partially_refunded')), 0)::float8 as revenue_ex_tax,
-      (select coalesce(sum(product_cost_paise + shipping_cost_paise), 0)::float8 from supplier_purchase_orders where status <> 'cancelled') as recorded_costs,
       count(*) filter (where status = 'awaiting_payment')::int as awaiting_payment
     from orders`;
   return s!;

@@ -124,8 +124,41 @@ describe("supplier fulfilment workflow", () => {
     expect(r.grossSalesPaise).toBeGreaterThan(0);
     expect(r.revenueExTaxPaise).toBeLessThan(r.grossSalesPaise);
     expect(r.ordersMissingCosts).toBeGreaterThan(0); // orders without supplier purchases are flagged, not hidden
-    expect(r.contributionPaise).toBe(
-      Math.round(r.revenueExTaxPaise - r.costsExRecoverableGstPaise - r.costGstNotRecoverablePaise - r.paymentFeesPaise - r.expensesPaise),
-    );
+    expect(r.grossProfitPaise).toBe(Math.round(r.revenueExTaxPaise - r.costsExRecoverableGstPaise - r.costGstNotRecoverablePaise));
+    expect(r.contributionPaise).toBe(Math.round(r.grossProfitPaise - r.paymentFeesPaise - r.expensesPaise));
+  });
+
+  it("counts GST on supplier costs exactly once in gross profit", async () => {
+    const from = new Date(Date.now() - 86400_000);
+    const to = new Date(Date.now() + 86400_000);
+    const cases = [
+      // GST included in the price and reclaimable: cost is the price less GST
+      { costsIncludeGst: true, itcEligible: true, productCostPaise: 50000, shippingCostPaise: 5000, gstOnCostsPaise: 8390, cost: 46610 },
+      // GST included and not reclaimable: the full price is the cost
+      { costsIncludeGst: true, itcEligible: false, productCostPaise: 50000, shippingCostPaise: 5000, gstOnCostsPaise: 8390, cost: 55000 },
+      // GST charged on top and reclaimable: the price is the cost
+      { costsIncludeGst: false, itcEligible: true, productCostPaise: 50000, shippingCostPaise: 0, gstOnCostsPaise: 9000, cost: 50000 },
+      // GST charged on top and not reclaimable: price plus GST
+      { costsIncludeGst: false, itcEligible: false, productCostPaise: 50000, shippingCostPaise: 0, gstOnCostsPaise: 9000, cost: 59000 },
+    ];
+    for (const c of cases) {
+      const o = await paidOrder();
+      const before = await financialReport(from, to);
+      await createSupplierPurchase(
+        o.id,
+        {
+          supplierId,
+          items: [{ orderItemId: o.items[0]!.id, quantity: 1, unitCostPaise: c.productCostPaise }],
+          shippingCostPaise: c.shippingCostPaise,
+          costsIncludeGst: c.costsIncludeGst,
+          gstOnCostsPaise: c.gstOnCostsPaise,
+          itcEligible: c.itcEligible,
+        },
+        admin,
+      );
+      const after = await financialReport(from, to);
+      expect(before.grossProfitPaise - after.grossProfitPaise).toBe(c.cost);
+      expect(before.revenueExTaxPaise).toBe(after.revenueExTaxPaise);
+    }
   });
 });
