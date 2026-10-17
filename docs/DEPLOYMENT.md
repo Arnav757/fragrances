@@ -6,7 +6,8 @@ The app is a standard Next.js 16 server application. Vercel + Supabase is the si
 
 1. **Database** — set up Supabase and run migrations as in [INTEGRATIONS.md §1](INTEGRATIONS.md). Use the transaction pooler URL.
 2. **Repository** — push this project to GitHub (`.env*` files are git-ignored; keep it that way).
-3. **Import** the repo in Vercel. Framework preset: Next.js. Build command `npm run build`, Node 20+ (22 recommended).
+3. **Import** the repo in Vercel. Framework preset: Next.js. Build command `npm run build`, Node 20+ (22 recommended). Set **Function Region** (Project → Settings → Functions) to the region closest to your Supabase database, e.g. `bom1` for Mumbai.
+   The build needs the environment variables below (at least `DATABASE_URL`, `APP_ENV`, `APP_SECRET`); add them before the first deploy or it will fail.
 4. **Environment variables** (Project → Settings → Environment Variables). For *Production*:
 
    | Variable | Value |
@@ -21,10 +22,7 @@ The app is a standard Next.js 16 server application. Vercel + Supabase is the si
    | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | |
 
    Do **not** set `ENABLE_MOCK_PAYMENTS` in production — the app refuses to start with it. For a *Preview/Staging* environment use `APP_ENV=staging`, Razorpay **test** keys and a separate database.
-5. **Cron** — add `vercel.json`:
-   ```json
-   { "crons": [{ "path": "/api/cron/expire-orders", "schedule": "0 * * * *" }] }
-   ```
+5. **Cron** — `vercel.json` (already in the repo) schedules `/api/cron/expire-orders` once a day, which is the most often the Hobby plan allows. Stale unpaid orders are also expired whenever an admin opens **Admin → Overview**. On Pro you can make it hourly by changing the schedule to `"0 * * * *"`.
    Vercel sends `Authorization: Bearer $CRON_SECRET` automatically when `CRON_SECRET` is set.
 6. **Domain** — add your domain in Vercel, then set `SITE_URL` to it and redeploy.
 7. **Razorpay webhook** — point it at `https://<domain>/api/webhooks/razorpay`.
