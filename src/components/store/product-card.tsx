@@ -23,11 +23,13 @@ export function ProductCard({ p, priority }: { p: Card; priority?: boolean }) {
             {p.productType === "inspired_fragrance" && <Badge tone="outline" className="bg-paper/90">Inspired fragrance</Badge>}
             {unavailable && <Badge tone="dark">{p.availability === "awaiting_supplier_confirmation" ? "Awaiting confirmation" : "Unavailable"}</Badge>}
           </div>
-          {p.isDemo && <span className="absolute right-3 bottom-3 bg-paper/90 px-1.5 py-0.5 text-[0.6rem] tracking-wide text-stone uppercase">Demo listing</span>}
         </div>
       </Link>
       <div className="mt-4 flex flex-1 flex-col">
-        <p className="eyebrow text-[0.625rem]">{p.brandName}</p>
+        <p className="eyebrow text-[0.625rem]">
+          {p.brandName}
+          {p.isDemo && <span className="text-stone/70"> · Demo listing</span>}
+        </p>
         <h3 className="mt-1 font-display text-xl leading-snug text-ink">
           <Link href={`/products/${p.slug}`} className="hover:underline hover:decoration-gold hover:underline-offset-4">
             {p.name}
