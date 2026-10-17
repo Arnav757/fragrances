@@ -37,7 +37,7 @@ npm ci
 npm run build
 APP_ENV=production node_modules/.bin/next start -p 3000
 ```
-Run behind HTTPS (cookies are `Secure` in production). If the proxy terminates TLS, forward `X-Forwarded-For`/`X-Forwarded-Host`. Product image uploads require Supabase Storage on any host without a persistent disk.
+Run behind HTTPS (cookies are `Secure` in production). If the proxy terminates TLS, forward `X-Forwarded-For`/`X-Forwarded-Host` and set `X-Real-IP` to the client address (rate limiting uses `X-Real-IP`, else the last `X-Forwarded-For` entry, because the first entry can be forged by the client). Product image uploads require Supabase Storage on any host without a persistent disk.
 
 ## Backups and operations
 

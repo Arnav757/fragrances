@@ -71,8 +71,11 @@ export async function logoutAction() {
 export async function forgotPasswordAction(_: FormState, form: FormData): Promise<FormState> {
   const email = String(form.get("email") ?? "");
   if (!(await rateLimit(`forgot:${await clientIp()}`, 5, 3600))) return { message: "Too many requests. Please try again later." };
+  // Per-address cap so nobody can flood one inbox with reset emails. Over the cap we answer exactly as
+  // usual (without sending) so the response never reveals whether the address has an account.
+  const perEmail = await rateLimit(`forgot:email:${email.trim().toLowerCase().slice(0, 254)}`, 3, 3600);
   try {
-    await requestPasswordReset(email);
+    if (perEmail) await requestPasswordReset(email);
   } catch (e) {
     if (e instanceof z.ZodError) return { errors: fieldErrors(e), values: { email } };
     throw e;
