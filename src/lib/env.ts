@@ -38,7 +38,9 @@ let cached: Env | null = null;
 
 export function env(): Env {
   if (cached) return cached;
-  const parsed = schema.safeParse(process.env);
+  // Blank lines copied from .env.example (e.g. `SUPABASE_URL=`) mean "not set", not "".
+  const raw = Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== ""));
+  const parsed = schema.safeParse(raw);
   if (!parsed.success) {
     throw new Error(
       "Invalid environment configuration: " + parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "),
