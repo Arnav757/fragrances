@@ -10,73 +10,53 @@ export const storeSettingsSchema = z.object({
   name: optionalText(80),
   legalBusinessName: optionalText(160),
   supportEmail: z.union([z.literal(""), z.email()]).default(""),
-  supportPhone: optionalText(30),
   whatsapp: optionalText(30),
-  supportHours: optionalText(120),
   businessAddress: optionalText(500),
   gstin: optionalText(20),
-  announcement: optionalText(160),
-  logoUrl: optionalText(500),
-  socials: z
-    .object({
-      instagram: optionalText(200),
-      facebook: optionalText(200),
-      youtube: optionalText(200),
-      x: optionalText(200),
-    })
-    .default({ instagram: "", facebook: "", youtube: "", x: "" }),
+  stylistName: optionalText(80), // shown on released reports, e.g. "Reviewed by Meera, senior stylist"
+  instagram: optionalText(200),
 });
 
-export const commerceSettingsSchema = z.object({
-  currency: z.literal("INR").default("INR"),
-  pricesIncludeTax: z.boolean().default(true),
-  sellerState: z.string().nullable().default(null),
-  chargesTaxRateBp: z.number().int().min(0).max(4000).nullable().default(null),
+export const pricingSettingsSchema = z.object({
+  standardPaise: z.number().int().min(100).max(10_000_000).default(149900),
+  standardHours: z.number().int().min(1).max(336).default(72),
+  priorityEnabled: z.boolean().default(true),
+  priorityPaise: z.number().int().min(100).max(10_000_000).default(229900),
+  priorityHours: z.number().int().min(1).max(336).default(24),
+  // GST on the service, included in the price. Must be confirmed with a tax adviser before launch.
+  gstRateBp: z.number().int().min(0).max(4000).default(1800),
   taxConfigVerified: z.boolean().default(false),
-  flatShippingPaise: z.number().int().nonnegative().default(9900),
-  freeShippingThresholdPaise: z.number().int().nonnegative().nullable().default(199900),
-  codEnabled: z.boolean().default(false),
-  codFeePaise: z.number().int().nonnegative().default(0),
-  codMaxOrderPaise: z.number().int().positive().default(500000),
-  deliveryEstimateMinDays: z.number().int().positive().nullable().default(null),
-  deliveryEstimateMaxDays: z.number().int().positive().nullable().default(null),
-  blockedPincodes: z.array(z.string().regex(/^\d{6}$/)).default([]),
-  serviceablePrefixes: z.array(z.string().regex(/^\d{1,6}$/)).default([]),
-  returnWindowDays: z.number().int().min(0).max(60).default(7),
-  pendingOrderExpiryHours: z.number().int().min(1).max(168).default(24),
+  orderExpiryHours: z.number().int().min(1).max(168).default(24),
 });
 
-export const homepageSettingsSchema = z.object({
-  heroEyebrow: optionalText(80),
-  heroTitle: optionalText(120),
-  heroSubtitle: optionalText(300),
-  heroImageUrl: optionalText(500),
-  storyTitle: optionalText(120),
-  storyBody: optionalText(1500),
+export const shopSettingsSchema = z.object({
+  amazonEnabled: z.boolean().default(true),
+  amazonTag: z.string().trim().max(40).default(""),
+  myntraEnabled: z.boolean().default(true),
+  ajioEnabled: z.boolean().default(true),
+});
+
+export const privacySettingsSchema = z.object({
+  photoRetentionDays: z.number().int().min(1).max(365).default(30),
+  unpaidRetentionDays: z.number().int().min(1).max(365).default(14),
 });
 
 export const pagesSettingsSchema = z.record(z.enum(PAGE_KEYS), z.string().max(30000));
 
 export type StoreSettings = z.infer<typeof storeSettingsSchema>;
-export type CommerceSettings = z.infer<typeof commerceSettingsSchema>;
-export type HomepageSettings = z.infer<typeof homepageSettingsSchema>;
+export type PricingSettings = z.infer<typeof pricingSettingsSchema>;
+export type ShopSettings = z.infer<typeof shopSettingsSchema>;
+export type PrivacySettings = z.infer<typeof privacySettingsSchema>;
 
 const DEFAULTS = {
-  store: storeSettingsSchema.parse({ name: brand.name, announcement: "Complimentary shipping on orders above ₹1,999" }),
-  commerce: commerceSettingsSchema.parse({}),
-  homepage: homepageSettingsSchema.parse({
-    heroEyebrow: "The Fragrance Edit",
-    heroTitle: "Middle Eastern perfumery, thoughtfully curated.",
-    heroSubtitle:
-      "Authentic fragrances from Lattafa, Afnan, Armaf, Rasasi and more — alongside clearly labelled inspired scents. Honest descriptions, transparent prices.",
-    storyTitle: "A boutique built on honest information",
-    storyBody:
-      "We started NOIR & NOTES for people who love fragrance and are tired of guesswork. Every listing tells you what it is — an authentic branded perfume or an inspired fragrance sold under its own name — and we only publish notes, prices and availability we can stand behind.",
-  }),
+  store: storeSettingsSchema.parse({ name: brand.name }),
+  pricing: pricingSettingsSchema.parse({}),
+  shop: shopSettingsSchema.parse({}),
+  privacy: privacySettingsSchema.parse({}),
 };
 
-type SettingsKey = keyof typeof DEFAULTS;
-const SCHEMAS = { store: storeSettingsSchema, commerce: commerceSettingsSchema, homepage: homepageSettingsSchema } as const;
+export type SettingsKey = keyof typeof DEFAULTS;
+const SCHEMAS = { store: storeSettingsSchema, pricing: pricingSettingsSchema, shop: shopSettingsSchema, privacy: privacySettingsSchema } as const;
 
 export async function getSettings<K extends SettingsKey>(key: K, q: Queryable = db()): Promise<(typeof DEFAULTS)[K]> {
   const rows = await q<{ value: unknown }[]>`select value from settings where key = ${key}`;
@@ -84,11 +64,6 @@ export async function getSettings<K extends SettingsKey>(key: K, q: Queryable = 
   const merged = { ...DEFAULTS[key], ...(stored && typeof stored === "object" ? stored : {}) };
   const parsed = SCHEMAS[key].safeParse(merged);
   return (parsed.success ? parsed.data : DEFAULTS[key]) as (typeof DEFAULTS)[K];
-}
-
-export async function getAllSettings() {
-  const [store, commerce, homepage] = await Promise.all([getSettings("store"), getSettings("commerce"), getSettings("homepage")]);
-  return { store, commerce, homepage };
 }
 
 export async function saveSettings(key: SettingsKey | "pages", value: unknown, actorId: string | null, q: Queryable = db()) {
@@ -107,4 +82,10 @@ export async function getPages(): Promise<Record<(typeof PAGE_KEYS)[number], str
 
 export function storeName(store: StoreSettings): string {
   return store.name || brand.name;
+}
+
+/** GST included in a tax-inclusive price. */
+export function includedTax(totalPaise: number, rateBp: number): number {
+  if (rateBp <= 0) return 0;
+  return Math.round(totalPaise - (totalPaise * 10000) / (10000 + rateBp));
 }

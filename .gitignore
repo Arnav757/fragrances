@@ -44,3 +44,6 @@ next-env.d.ts
 /public/uploads/
 /scripts/.shot.mjs
 /test-results/
+
+# local private photo storage
+/.data

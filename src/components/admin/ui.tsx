@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { ADMIN_STATUS_LABEL, PAYMENT_LABEL, type OrderStatus, type PaymentStatus } from "@/lib/order-status";
 
 export function PageHeader({ title, description, actions, back }: { title: string; description?: ReactNode; actions?: ReactNode; back?: { href: string; label: string } }) {
   return (
@@ -22,9 +21,9 @@ export function PageHeader({ title, description, actions, back }: { title: strin
 
 export function Stat({ label, value, hint, tone }: { label: string; value: ReactNode; hint?: ReactNode; tone?: "warning" }) {
   return (
-    <div className={cn("border bg-paper p-5", tone === "warning" ? "border-warning/40" : "border-line")}>
+    <div className={cn("rounded-2xl border bg-paper p-5", tone === "warning" ? "border-warning/40" : "border-line")}>
       <p className="text-[0.6875rem] tracking-[0.14em] text-stone uppercase">{label}</p>
-      <p className="mt-2 font-display text-3xl text-ink tabular-nums">{value}</p>
+      <p className="mt-2 font-display text-3xl font-semibold tracking-tight text-ink tabular-nums">{value}</p>
       {hint && <p className="mt-1 text-xs text-stone">{hint}</p>}
     </div>
   );
@@ -32,7 +31,7 @@ export function Stat({ label, value, hint, tone }: { label: string; value: React
 
 export function Panel({ title, children, actions, className }: { title?: string; children: ReactNode; actions?: ReactNode; className?: string }) {
   return (
-    <section className={cn("border border-line bg-paper", className)}>
+    <section className={cn("rounded-2xl border border-line bg-paper", className)}>
       {(title || actions) && (
         <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
           {title && <h2 className="text-[0.6875rem] font-medium tracking-[0.14em] text-ink uppercase">{title}</h2>}
@@ -46,7 +45,7 @@ export function Panel({ title, children, actions, className }: { title?: string;
 
 export function Table({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto border border-line bg-paper">
+    <div className="overflow-x-auto rounded-2xl border border-line bg-paper">
       <table className="w-full min-w-[640px] text-left text-sm [&_td]:border-t [&_td]:border-line [&_td]:px-4 [&_td]:py-3 [&_th]:px-4 [&_th]:py-2.5 [&_th]:text-[0.6875rem] [&_th]:font-medium [&_th]:tracking-[0.1em] [&_th]:text-stone [&_th]:uppercase">
         {children}
       </table>
@@ -54,36 +53,28 @@ export function Table({ children }: { children: ReactNode }) {
   );
 }
 
-const statusTone: Partial<Record<OrderStatus, string>> = {
-  awaiting_payment: "bg-sand text-stone",
-  payment_failed: "bg-danger/10 text-danger",
-  confirmed: "bg-gold-soft text-gold-deep",
-  awaiting_supplier_purchase: "bg-warning/10 text-warning",
-  supplier_ordered: "bg-warning/10 text-warning",
-  supplier_confirmed: "bg-warning/10 text-warning",
-  shipped: "bg-ink/10 text-ink",
-  delivered: "bg-success/10 text-success",
-  cancellation_requested: "bg-danger/10 text-danger",
-  cancelled: "bg-sand text-stone",
-  return_requested: "bg-danger/10 text-danger",
-  returned: "bg-sand text-stone",
-  refunded: "bg-sand text-stone",
+const ANALYSIS_TONE: Record<string, [string, string]> = {
+  preview: ["Preview (unpaid)", "bg-sand text-stone"],
+  paid: ["Needs review", "bg-warning/10 text-warning"],
+  revision_requested: ["Revision requested", "bg-danger/10 text-danger"],
+  released: ["Released", "bg-success/10 text-success"],
 };
 
-export function StatusBadge({ status }: { status: OrderStatus }) {
-  return <span className={cn("inline-block px-2 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap", statusTone[status])}>{ADMIN_STATUS_LABEL[status]}</span>;
+export function AnalysisStatusBadge({ status }: { status: string }) {
+  const [label, tone] = ANALYSIS_TONE[status] ?? [status, "bg-sand text-stone"];
+  return <span className={cn("inline-block rounded-full px-2.5 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap", tone)}>{label}</span>;
 }
 
-export function PaymentBadge({ status }: { status: PaymentStatus }) {
-  const tone =
-    status === "paid" || status === "cod_collected"
-      ? "text-success"
-      : status === "failed"
-        ? "text-danger"
-        : status === "refunded" || status === "partially_refunded" || status === "cancelled"
-          ? "text-stone"
-          : "text-warning";
-  return <span className={cn("text-xs whitespace-nowrap", tone)}>{PAYMENT_LABEL[status]}</span>;
+const ORDER_TONE: Record<string, string> = {
+  paid: "text-success",
+  awaiting_payment: "text-warning",
+  payment_failed: "text-danger",
+  expired: "text-stone",
+  refunded: "text-stone",
+};
+
+export function OrderStatusText({ status }: { status: string }) {
+  return <span className={cn("text-xs whitespace-nowrap", ORDER_TONE[status])}>{status.replace(/_/g, " ")}</span>;
 }
 
 export function KV({ items }: { items: [string, ReactNode][] }) {

@@ -6,22 +6,22 @@ type Variant = "primary" | "secondary" | "outline" | "ghost" | "link" | "danger"
 type Size = "sm" | "md" | "lg" | "icon";
 
 const base =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-sans font-medium tracking-[0.08em] uppercase transition-colors duration-200 ease-out-soft disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-deep";
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-sans font-medium tracking-[-0.005em] transition-colors duration-200 ease-out-soft disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-deep";
 
 const variants: Record<Variant, string> = {
   primary: "bg-ink text-paper hover:bg-charcoal",
   secondary: "bg-sand text-ink hover:bg-line",
   outline: "border border-ink/80 text-ink hover:bg-ink hover:text-paper",
   ghost: "text-ink hover:bg-sand",
-  link: "text-ink underline underline-offset-4 decoration-gold hover:decoration-ink normal-case tracking-normal",
+  link: "rounded-none text-ink underline underline-offset-4 decoration-gold hover:decoration-ink",
   danger: "bg-danger text-paper hover:bg-danger/90",
-  gold: "bg-gold text-ink hover:bg-gold-soft",
+  gold: "bg-gold text-paper hover:bg-gold-deep",
 };
 
 const sizes: Record<Size, string> = {
-  sm: "h-9 px-4 text-[0.6875rem]",
-  md: "h-11 px-6 text-xs",
-  lg: "h-13 px-8 text-xs",
+  sm: "h-9 px-4 text-[0.8125rem]",
+  md: "h-11 px-6 text-sm",
+  lg: "h-14 px-8 text-[0.9375rem]",
   icon: "h-10 w-10",
 };
 

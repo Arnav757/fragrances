@@ -23,7 +23,7 @@ const tones: Record<Tone, string> = {
 
 export function Badge({ children, tone = "neutral", className }: { children: ReactNode; tone?: Tone; className?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 text-[0.6875rem] font-medium tracking-wide", tones[tone], className)}>{children}</span>
+    <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[0.6875rem] font-medium tracking-wide", tones[tone], className)}>{children}</span>
   );
 }
 
@@ -39,7 +39,7 @@ export function SectionHeading({ eyebrow, title, description, action, className,
     <div className={cn("mb-8 flex flex-col gap-4 sm:mb-10 sm:flex-row sm:items-end sm:justify-between", align === "center" && "items-center text-center sm:flex-col sm:items-center", className)}>
       <div className={cn("max-w-2xl", align === "center" && "mx-auto")}>
         {eyebrow && <p className="eyebrow mb-3">{eyebrow}</p>}
-        <h2 className="text-3xl leading-[1.1] text-ink sm:text-[2.6rem]">{title}</h2>
+        <h2 className="text-3xl leading-[1.05] text-ink sm:text-[2.6rem]">{title}</h2>
         {description && <p className="mt-3 text-sm leading-relaxed text-stone sm:text-[0.95rem]">{description}</p>}
       </div>
       {action}
@@ -49,7 +49,7 @@ export function SectionHeading({ eyebrow, title, description, action, className,
 
 export function EmptyState({ title, description, action, icon }: { title: string; description?: ReactNode; action?: ReactNode; icon?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center border border-dashed border-line bg-paper/60 px-6 py-16 text-center">
+    <div className="flex flex-col items-center rounded-2xl border border-dashed border-line bg-paper/60 px-6 py-16 text-center">
       {icon && <div className="mb-4 text-mist">{icon}</div>}
       <h3 className="text-2xl text-ink">{title}</h3>
       {description && <p className="mt-2 max-w-md text-sm leading-relaxed text-stone">{description}</p>}
@@ -66,7 +66,7 @@ export function Notice({ tone = "neutral", title, children, className }: { tone?
     success: "border-success/30 bg-success/5 text-charcoal",
   }[tone];
   return (
-    <div role={tone === "danger" ? "alert" : "status"} className={cn("border px-4 py-3 text-sm leading-relaxed", t, className)}>
+    <div role={tone === "danger" ? "alert" : "status"} className={cn("rounded-xl border px-4 py-3 text-sm leading-relaxed", t, className)}>
       {title && <p className="mb-0.5 font-medium text-ink">{title}</p>}
       {children}
     </div>

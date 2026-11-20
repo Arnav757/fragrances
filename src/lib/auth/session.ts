@@ -5,15 +5,14 @@ import { cache } from "react";
 import { db, type Queryable } from "../db";
 import { randomToken, sha256 } from "./crypto";
 
-export const SESSION_COOKIE = "nn_session";
-const SESSION_DAYS = 30;
+export const SESSION_COOKIE = "fm_session";
+const SESSION_DAYS = 14;
 
 export type SessionUser = {
   id: string;
   email: string;
   fullName: string;
-  phone: string | null;
-  role: "customer" | "admin";
+  role: "stylist" | "admin";
 };
 
 const secure = () => process.env.NODE_ENV === "production" && !process.env.INSECURE_COOKIES;
@@ -50,7 +49,7 @@ export async function endSession() {
 export async function userFromToken(token: string | undefined, q: Queryable = db()): Promise<SessionUser | null> {
   if (!token || token.length > 200) return null;
   const rows = await q<SessionUser[]>`
-    select p.id, p.email, p.full_name, p.phone, p.role
+    select p.id, p.email, p.full_name, p.role
     from sessions s join profiles p on p.id = s.user_id
     where s.token_hash = ${sha256(token)} and s.expires_at > now() and not p.is_disabled`;
   return rows[0] ?? null;
@@ -62,11 +61,6 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   return userFromToken(jar.get(SESSION_COOKIE)?.value);
 });
 
-export async function requireUser(nextPath = "/account"): Promise<SessionUser> {
-  const user = await getCurrentUser();
-  if (!user) redirect(`/login?next=${encodeURIComponent(nextPath)}`);
-  return user;
-}
 
 export class AuthorizationError extends Error {
   constructor(message = "Not authorised") {
@@ -75,15 +69,27 @@ export class AuthorizationError extends Error {
   }
 }
 
-/** For admin pages: redirects non-admins. Authorization is always checked against the database. */
-export async function requireAdminPage(): Promise<SessionUser> {
+/** For staff pages (stylists and admins): redirects everyone else. Always checked against the database. */
+export async function requireStaffPage(): Promise<SessionUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/admin");
-  if (user.role !== "admin") redirect("/");
   return user;
 }
 
-/** For admin server actions / route handlers: throws instead of redirecting. */
+/** For admin-only pages (settings, discounts, refunds). */
+export async function requireAdminPage(): Promise<SessionUser> {
+  const user = await requireStaffPage();
+  if (user.role !== "admin") redirect("/admin");
+  return user;
+}
+
+/** For staff server actions / route handlers: throws instead of redirecting. */
+export async function requireStaff(): Promise<SessionUser> {
+  const user = await getCurrentUser();
+  if (!user) throw new AuthorizationError();
+  return user;
+}
+
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await getCurrentUser();
   if (!user || user.role !== "admin") throw new AuthorizationError();

@@ -1,36 +1,26 @@
+import type { Metadata } from "next";
+import { PageHeader, Panel } from "@/components/admin/ui";
+import { PagesForm, PricingForm, PrivacyForm, ShopForm, StoreForm } from "@/components/admin/forms";
 import { requireAdminPage } from "@/lib/auth/session";
-import { getAllSettings, getPages } from "@/lib/settings";
-import { integrationStatus } from "@/lib/env";
-import { KV, PageHeader, Panel } from "@/components/admin/ui";
-import { CommerceSettingsForm, HomepageSettingsForm, PagesForm, StoreSettingsForm } from "@/components/admin/settings-forms";
-import { Badge } from "@/components/ui/misc";
+import { getPages, getSettings } from "@/lib/settings";
+import { PAGE_META } from "@/lib/default-pages";
 
-export const metadata = { title: "Settings" };
-
-const ok = (b: boolean, yes = "Configured", no = "Not configured") => <Badge tone={b ? "success" : "warning"}>{b ? yes : no}</Badge>;
+export const metadata: Metadata = { title: "Settings" };
+export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   await requireAdminPage();
-  const [{ store, commerce, homepage }, pages] = await Promise.all([getAllSettings(), getPages()]);
-  const s = integrationStatus();
+  const [store, pricing, shop, privacy, pages] = await Promise.all([getSettings("store"), getSettings("pricing"), getSettings("shop"), getSettings("privacy"), getPages()]);
   return (
-    <div className="space-y-8">
-      <PageHeader title="Settings" description="Secrets (API keys) are set as environment variables, never here." />
-      <Panel title="Integrations (read-only)">
-        <KV items={[
-          ["Environment", <Badge key="e" tone={s.appEnv === "production" ? "dark" : "warning"}>{s.appEnv}</Badge>],
-          ["Razorpay", <span key="r">{ok(s.razorpay.configured, `Configured (${s.razorpay.mode})`)} {s.mockPayments && <Badge tone="warning">Simulated payments ON</Badge>}</span>],
-          ["Razorpay webhook", ok(s.razorpay.webhook)],
-          ["Email (Resend)", ok(s.email.configured, "Configured", "Not configured — emails are logged only")],
-          ["Image storage", ok(s.storage.configured, `Supabase bucket "${s.storage.bucket}"`, "Local disk (development only)")],
-          ["Shiprocket", ok(s.shiprocket.configured, "Configured (serviceability checks)", "Not connected — manual tracking")],
-        ]} />
-        <p className="mt-4 text-xs text-stone">See README → “External accounts” for how to configure each one.</p>
-      </Panel>
-      <Panel title="Store details"><StoreSettingsForm initial={store} /></Panel>
-      <Panel title="Commerce: tax, shipping, COD"><CommerceSettingsForm initial={commerce} /></Panel>
-      <Panel title="Homepage content"><HomepageSettingsForm initial={homepage} /></Panel>
-      <Panel title="Policy & information pages"><PagesForm initial={pages} /></Panel>
-    </div>
+    <>
+      <PageHeader title="Settings" />
+      <div className="space-y-6">
+        <Panel title="Business"><StoreForm v={store} /></Panel>
+        <Panel title="Pricing & review times"><PricingForm v={pricing} /></Panel>
+        <Panel title="Shop links"><ShopForm v={shop} /></Panel>
+        <Panel title="Privacy & retention"><PrivacyForm v={privacy} /></Panel>
+        <Panel title="Pages"><PagesForm pages={pages} labels={Object.fromEntries(Object.entries(PAGE_META).map(([k, m]) => [k, m.title]))} /></Panel>
+      </div>
+    </>
   );
 }

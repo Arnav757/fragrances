@@ -2,25 +2,15 @@ import "server-only";
 import { db } from "../db";
 import { dummyHash, hashPassword, verifyPassword } from "../auth/password";
 import { randomToken, sha256 } from "../auth/crypto";
-import { emailSchema, loginSchema, passwordSchema, registerSchema } from "../validation";
+import { emailSchema, loginSchema, passwordSchema } from "../validation";
 import { emailContext, sendEmail, siteUrl } from "../email/send";
 import { templates } from "../email/templates";
 
 export class AuthError extends Error {}
 
-export async function registerUser(input: unknown): Promise<{ id: string }> {
-  const data = registerSchema.parse(input);
-  const passwordHash = await hashPassword(data.password);
-  const rows = await db()<{ id: string }[]>`
-    insert into profiles (email, password_hash, full_name) values (${data.email}, ${passwordHash}, ${data.fullName})
-    on conflict (email) do nothing returning id`;
-  if (!rows[0]) throw new AuthError("An account with this email already exists. Try signing in or resetting your password.");
-  return rows[0];
-}
-
-export async function authenticate(input: unknown): Promise<{ id: string; role: "customer" | "admin" }> {
+export async function authenticate(input: unknown): Promise<{ id: string; role: "stylist" | "admin" }> {
   const data = loginSchema.parse(input);
-  const rows = await db()<{ id: string; passwordHash: string; role: "customer" | "admin"; isDisabled: boolean }[]>`
+  const rows = await db()<{ id: string; passwordHash: string; role: "stylist" | "admin"; isDisabled: boolean }[]>`
     select id, password_hash, role, is_disabled from profiles where email = ${data.email}`;
   const u = rows[0];
   const ok = await verifyPassword(u?.passwordHash ?? (await dummyHash()), data.password);
@@ -37,7 +27,7 @@ export async function requestPasswordReset(emailInput: unknown): Promise<void> {
   const token = randomToken(32);
   await db()`delete from password_reset_tokens where user_id = ${u.id}`;
   await db()`insert into password_reset_tokens (token_hash, user_id, expires_at) values (${sha256(token)}, ${u.id}, now() + interval '60 minutes')`;
-  const ctx = await emailContext(null);
+  const ctx = await emailContext();
   await sendEmail(email, "password_reset", templates.password_reset(ctx, { name: u.fullName, resetUrl: siteUrl(`/reset-password?token=${token}`) }));
 }
 

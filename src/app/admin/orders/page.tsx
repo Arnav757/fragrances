@@ -1,96 +1,43 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { OrderStatusText, PageHeader, Table } from "@/components/admin/ui";
+import { RefundButton } from "@/components/admin/forms";
 import { requireAdminPage } from "@/lib/auth/session";
-import { adminListOrders } from "@/lib/services/admin-orders";
-import { ADMIN_STATUS_LABEL, ORDER_STATUSES, PAYMENT_LABEL, PAYMENT_STATUSES } from "@/lib/order-status";
+import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import { formatDate } from "@/lib/utils";
-import { PageHeader, PaymentBadge, StatusBadge, Table } from "@/components/admin/ui";
-import { Button, ButtonLink } from "@/components/ui/button";
-import { Input, Select } from "@/components/ui/form";
-import { EmptyState } from "@/components/ui/misc";
 
-export const metadata = { title: "Orders" };
+export const metadata: Metadata = { title: "Orders" };
+export const dynamic = "force-dynamic";
 
-type SP = Promise<Record<string, string | undefined>>;
-
-export default async function AdminOrders({ searchParams }: { searchParams: SP }) {
+export default async function OrdersPage() {
   await requireAdminPage();
-  const sp = await searchParams;
-  const { rows, total, page, pageCount } = await adminListOrders({ q: sp.q, status: sp.status, payment: sp.payment, from: sp.from, to: sp.to, page: Number(sp.page) || 1 });
-  const qs = (p: number) => {
-    const u = new URLSearchParams(Object.entries(sp).filter(([, v]) => v) as [string, string][]);
-    u.set("page", String(p));
-    return `/admin/orders?${u}`;
-  };
-  const exportQs = new URLSearchParams(Object.entries({ from: sp.from, to: sp.to }).filter(([, v]) => v) as [string, string][]);
+  const rows = await db()<{ id: string; orderNumber: string; analysisId: string; ref: string; contactName: string; contactEmail: string; plan: string; totalPaise: number; taxPaise: number; discountCode: string | null; status: string; createdAt: Date; paidAt: Date | null }[]>`
+    select o.id, o.order_number, o.analysis_id, a.ref, o.contact_name, o.contact_email, o.plan, o.total_paise, o.tax_paise, o.discount_code, o.status, o.created_at, o.paid_at
+    from orders o join analyses a on a.id = o.analysis_id order by o.created_at desc limit 300`;
   return (
-    <div>
-      <PageHeader title="Orders" description={`${total} order${total === 1 ? "" : "s"}`} actions={<ButtonLink href={`/admin/export/orders?${exportQs}`} variant="outline" size="sm">Export CSV</ButtonLink>} />
-      <form className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-6" method="get">
-        <label className="sr-only" htmlFor="q">Search</label>
-        <Input id="q" name="q" placeholder="Order no., name, email, phone" defaultValue={sp.q} className="lg:col-span-2" />
-        <label className="sr-only" htmlFor="status">Status</label>
-        <Select id="status" name="status" defaultValue={sp.status ?? ""}>
-          <option value="">All statuses</option>
-          {ORDER_STATUSES.map((s) => <option key={s} value={s}>{ADMIN_STATUS_LABEL[s]}</option>)}
-        </Select>
-        <label className="sr-only" htmlFor="payment">Payment</label>
-        <Select id="payment" name="payment" defaultValue={sp.payment ?? ""}>
-          <option value="">All payments</option>
-          {PAYMENT_STATUSES.map((s) => <option key={s} value={s}>{PAYMENT_LABEL[s]}</option>)}
-        </Select>
-        <div className="flex gap-2 lg:col-span-2">
-          <label className="sr-only" htmlFor="from">From</label>
-          <Input id="from" type="date" name="from" defaultValue={sp.from} />
-          <label className="sr-only" htmlFor="to">To</label>
-          <Input id="to" type="date" name="to" defaultValue={sp.to} />
-          <Button type="submit" variant="secondary">Filter</Button>
-        </div>
-      </form>
-      {rows.length === 0 ? (
-        <EmptyState title="No orders found" description="Try adjusting the filters." />
-      ) : (
-        <Table>
-          <thead>
-            <tr>
-              <th>Order</th>
-              <th>Date</th>
-              <th>Customer</th>
-              <th>Status</th>
-              <th>Payment</th>
-              <th className="text-right">Total</th>
-              <th className="text-right">Supplier cost</th>
+    <>
+      <PageHeader title="Orders & refunds" description="Payments are verified server-side against Razorpay. Refunds go back to the original payment method." />
+      <Table>
+        <thead>
+          <tr><th>Order</th><th>Report</th><th>Customer</th><th>Plan</th><th>Total</th><th>Status</th><th>Created</th><th /></tr>
+        </thead>
+        <tbody>
+          {rows.map((o) => (
+            <tr key={o.id}>
+              <td className="font-medium">{o.orderNumber}</td>
+              <td><Link href={`/admin/reports/${o.analysisId}`} className="underline-offset-2 hover:underline">{o.ref}</Link></td>
+              <td>{o.contactName}<span className="block text-xs text-stone">{o.contactEmail}</span></td>
+              <td className="text-xs">{o.plan}</td>
+              <td className="tabular-nums">{formatINR(o.totalPaise)}{o.discountCode && <span className="block text-xs text-stone">code {o.discountCode}</span>}<span className="block text-xs text-stone">incl. GST {formatINR(o.taxPaise)}</span></td>
+              <td><OrderStatusText status={o.status} /></td>
+              <td className="text-xs text-stone">{formatDate(o.createdAt, true)}</td>
+              <td>{o.status === "paid" && <RefundButton orderId={o.id} />}</td>
             </tr>
-          </thead>
-          <tbody>
-            {rows.map((o) => (
-              <tr key={o.id} className="hover:bg-ivory">
-                <td>
-                  <Link href={`/admin/orders/${o.id}`} className="font-medium hover:underline">{o.orderNumber}</Link>
-                  {o.openRequests > 0 && <span className="ml-2 text-[0.6875rem] text-danger">{o.openRequests} request</span>}
-                  <p className="text-xs text-stone">{o.itemCount} item{o.itemCount === 1 ? "" : "s"} · {o.paymentMethod === "cod" ? "COD" : "Online"}</p>
-                </td>
-                <td className="text-xs whitespace-nowrap text-stone">{formatDate(o.createdAt, true)}</td>
-                <td>
-                  {o.contactName}
-                  <p className="text-xs text-stone">{o.contactEmail}</p>
-                </td>
-                <td><StatusBadge status={o.status} /></td>
-                <td><PaymentBadge status={o.paymentStatus} /></td>
-                <td className="text-right tabular-nums">{formatINR(o.totalPaise)}</td>
-                <td className="text-right text-stone tabular-nums">{o.supplierCostPaise != null ? formatINR(o.supplierCostPaise) : "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
-      {pageCount > 1 && (
-        <div className="mt-6 flex justify-center gap-2 text-sm">
-          {page > 1 && <Link href={qs(page - 1)} className="underline">Previous</Link>}
-          <span className="text-stone">Page {page} of {pageCount}</span>
-          {page < pageCount && <Link href={qs(page + 1)} className="underline">Next</Link>}
-        </div>
-      )}
-    </div>
+          ))}
+          {!rows.length && <tr><td colSpan={8} className="py-10 text-center text-stone">No orders yet.</td></tr>}
+        </tbody>
+      </Table>
+    </>
   );
 }

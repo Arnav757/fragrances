@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const name = store ? storeName(store) : brand.name;
   return {
     metadataBase: new URL(env().SITE_URL),
-    title: { default: `${name} — Middle Eastern fragrances, honestly priced`, template: `%s | ${name}` },
+    title: { default: `${name} — Personal styling for Indian men`, template: `%s | ${name}` },
     description: brand.description,
     applicationName: name,
     openGraph: { type: "website", siteName: name, locale: "en_IN", description: brand.description },
@@ -22,11 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export const viewport: Viewport = {
-  themeColor: "#f6f1e8",
-  width: "device-width",
-  initialScale: 1,
-};
+export const viewport: Viewport = { themeColor: "#f3f1ec", width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -35,12 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <Toaster
           position="bottom-center"
-          toastOptions={{
-            classNames: {
-              toast: "!rounded-none !border-line !bg-paper !text-ink !font-sans !shadow-lg",
-              description: "!text-stone",
-            },
-          }}
+          toastOptions={{ classNames: { toast: "!rounded-xl !border-line !bg-paper !text-ink !font-sans !shadow-lg", description: "!text-stone" } }}
         />
       </body>
     </html>
