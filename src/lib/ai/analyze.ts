@@ -103,7 +103,7 @@ export async function analysePhotos(quiz: Quiz, base: Observations, photos: { he
   });
 
   try {
-    const client = new Anthropic({ apiKey: e.ANTHROPIC_API_KEY, timeout: 50_000, maxRetries: 1 });
+    const client = new Anthropic({ apiKey: e.ANTHROPIC_API_KEY, timeout: 45_000, maxRetries: 0 });
     const response = await client.messages.parse({
       model: e.ANTHROPIC_MODEL,
       max_tokens: 8000,

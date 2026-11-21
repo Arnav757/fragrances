@@ -31,7 +31,7 @@ Use separate databases for preview and production deployments: migrations run ag
 ### Remaining production setup
 
 - **Private photo bucket** — Supabase → Storage → New bucket `client-photos`, **Public: off**. The app only ever reads it with the service-role key on the server. In production, photos are never stored on local disk.
-- **Function duration** — photo analysis runs inside a server action that can take up to ~60 s (`/start` sets `maxDuration = 90`); make sure your Vercel plan allows it.
+- **Function duration** — photo analysis runs inside a server action capped at 45 s (falls back to quiz answers after that); `/start` sets `maxDuration = 60`, which the free Vercel plan allows.
 - **Cron** — `vercel.json` runs `/api/cron/retention` daily (photo deletion, unpaid-preview cleanup, checkout expiry). Vercel sends `Authorization: Bearer $CRON_SECRET` automatically.
 - **Razorpay webhook** — `https://<domain>/api/webhooks/razorpay` with events `payment.captured`, `payment.failed`, `order.paid`, `refund.processed`, `refund.failed`.
 - **Stylist accounts** — `ADMIN_PASSWORD='…' npm run admin:create -- stylist@… "Name"`, then `update profiles set role = 'stylist' where email = '…'` (stylists review and release; they can't refund or change settings).

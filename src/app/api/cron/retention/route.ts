@@ -3,7 +3,7 @@ import { safeEqual } from "@/lib/auth/crypto";
 import { runRetention } from "@/lib/services/analyses";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 /** Daily privacy housekeeping (photo deletion, unpaid preview cleanup, order expiry). `Authorization: Bearer $CRON_SECRET`. */
 export async function GET(req: Request) {

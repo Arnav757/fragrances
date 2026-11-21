@@ -4,7 +4,7 @@ import { Container } from "@/components/ui/misc";
 
 export const metadata: Metadata = { title: "Start your free analysis", description: "Three minutes and two photos. See your frame, colours and first outfits free." };
 // Photo analysis runs inside the submit action on this page.
-export const maxDuration = 90;
+export const maxDuration = 60;
 
 export default function StartPage() {
   return (
