@@ -1,0 +1,10 @@
+# Vision, drawing and speech-to-text. Python 3.11.
+numpy==1.26.4
+mediapipe==0.10.14   # legacy solutions.face_mesh API; needs Python 3.11
+opencv-python
+scikit-image
+scipy
+pycairo==1.29.2
+soundfile
+faster-whisper==1.2.1
+kokoro-onnx==0.3.3   # 0.4+ needs numpy 2, which breaks MediaPipe 0.10.14 and Chatterbox

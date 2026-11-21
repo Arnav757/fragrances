@@ -47,3 +47,7 @@ next-env.d.ts
 
 # local private photo storage
 /.data
+
+# content studio renders and assets
+/studio/work/
+__pycache__/
