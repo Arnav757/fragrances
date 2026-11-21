@@ -57,6 +57,10 @@ npm run dev                         # http://localhost:3000 — studio at /admin
 
 With `ENABLE_MOCK_PAYMENTS=true` and no Razorpay keys, checkout shows a **simulated payment** panel. Without `ANTHROPIC_API_KEY`, analyses use quiz answers only. Without Resend, emails appear in **Studio → Email log** marked "logged, not sent". A banner on every page lists what's simulated.
 
+## Deploy to Vercel
+
+Import the repo, add a Supabase or Neon database from the Vercel Storage tab, set `APP_SECRET`, `CRON_SECRET`, `SITE_URL`, `APP_ENV` and `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD`, and deploy. Migrations and the first admin are handled by the build (`vercel-build`). Details in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 ## Scripts
 
 | Command | What it does |
@@ -65,7 +69,8 @@ With `ENABLE_MOCK_PAYMENTS=true` and no Razorpay keys, checkout shows a **simula
 | `npm run check` | Lint, typecheck, tests and build |
 | `npm test` | Unit + integration tests (needs Postgres; uses `TEST_DATABASE_URL`, which is wiped) |
 | `npm run test:e2e` | Browser test against a running app: quiz → preview → simulated payment → stylist release. Needs `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD` |
-| `npm run db:migrate` | Apply migrations |
+| `npm run db:migrate` | Apply migrations (also runs automatically on every Vercel deploy) |
+| `npm run db:bootstrap-admin` | Create the first admin from `BOOTSTRAP_ADMIN_*` if no admin exists |
 | `npm run admin:create -- email "Name"` | Create or promote an admin |
 
 ## Docs

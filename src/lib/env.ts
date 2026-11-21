@@ -7,7 +7,7 @@ const bool = z
   .transform((v) => v === "true" || v === "1");
 
 const schema = z.object({
-  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+  DATABASE_URL: z.string().min(1, "DATABASE_URL (or POSTGRES_URL) is required"),
   APP_ENV: z.enum(["development", "test", "staging", "production"]).default("development"),
   SITE_URL: z.string().url().default("http://localhost:3000"),
   // Signs the simulated payment gateway and other server secrets. Must be a long random value in staging/production.
@@ -37,10 +37,22 @@ export type Env = z.infer<typeof schema>;
 
 let cached: Env | null = null;
 
+function withoutSupaParam(url: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.delete("supa");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 export function env(): Env {
   if (cached) return cached;
   // Blank lines copied from .env.example (e.g. `SUPABASE_URL=`) mean "not set", not "".
-  const raw = Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== ""));
+  const raw: Record<string, string | undefined> = Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== ""));
+  // Supabase's Vercel integration provides POSTGRES_URL (with a non-standard `supa` parameter) instead of DATABASE_URL.
+  if (!raw.DATABASE_URL && raw.POSTGRES_URL) raw.DATABASE_URL = withoutSupaParam(raw.POSTGRES_URL);
   const parsed = schema.safeParse(raw);
   if (!parsed.success) {
     throw new Error(
