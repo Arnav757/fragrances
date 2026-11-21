@@ -35,7 +35,7 @@ if missing.
 | pycairo | Drawing overlays, labels, thumbnails and the cursor | IBM Plex Mono has no ✓/✗ glyphs: draw ticks and crosses as paths |
 | OpenCV, scikit-image, SciPy | Masks, wireframe lines, logo removal, audio resampling | |
 | ffmpeg | Cutting, encoding, `delogo`, joining | System install |
-| Fonts | Playfair Display (incl. Italic), IBM Plex Mono, Syne | From github.com/google/fonts (OFL) |
+| Fonts | Playfair Display (incl. Italic), IBM Plex Mono, Syne, Inter Tight (FORMA brand) | From github.com/google/fonts (OFL) |
 
 Check everything any time:
 
@@ -44,7 +44,21 @@ source ~/.venvs/studio/bin/activate
 python studio/tools/selftest.py --face some_photo.jpg --full
 ```
 
-## Making a reel
+## Making a reel (the pipeline that produced *Arjun's Outfit Glowup*)
+
+```bash
+source ~/.venvs/studio/bin/activate
+W=studio/work/arjun                                   # assets/ holds the brief's images
+python studio/lib/voice.py studio/reels/arjun_outfit.lines.txt $W/voice --prompt $W/voice/kabir_voice_prompt.wav   # narration
+python studio/lib/timeline.py $W/voice                 # word timestamps, checked against the script
+python studio/lib/facemap.py $W/landmarks.json $W/assets/*.png                              # pose + face points
+PYTHONPATH=studio/lib python studio/lib/silhouette.py $W img1_before img2_fit img3_balance img5_after_studio  # outline widths
+python studio/reels/arjun_outfit.py $W --stills        # look at key frames first
+python studio/reels/arjun_outfit.py $W                 # render: per-scene encode → join → audio
+python studio/lib/verify_sync.py $W/render/arjun_outfit_glowup.mp4 $W/render/events.json  # ±80 ms check
+```
+
+Or hand the whole job to Claude Code:
 
 1. Generate the images and clips from a brief in `briefs/` (e.g. `briefs/arjun-outfit-glowup.md`) and
    put them, named as the brief says, in `studio/work/<reel>/assets/`.

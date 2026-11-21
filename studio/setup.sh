@@ -55,7 +55,7 @@ mkdir -p "$FONT_DIR"
 B=https://raw.githubusercontent.com/google/fonts/main/ofl
 for p in "playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf" "playfairdisplay/PlayfairDisplay-Italic%5Bwght%5D.ttf" \
          "ibmplexmono/IBMPlexMono-Regular.ttf" "ibmplexmono/IBMPlexMono-Medium.ttf" "ibmplexmono/IBMPlexMono-SemiBold.ttf" \
-         "syne/Syne%5Bwght%5D.ttf"; do
+         "syne/Syne%5Bwght%5D.ttf" "intertight/InterTight%5Bwght%5D.ttf"; do
   n="$(basename "$p" | sed 's/%5B/[/; s/%5D/]/')"
   [[ -f "$FONT_DIR/$n" ]] || curl -sfL "$B/$p" -o "$FONT_DIR/$n"
 done
