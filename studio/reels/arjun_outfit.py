@@ -4,7 +4,9 @@
     python studio/reels/arjun_outfit.py studio/work/arjun --stills   # key frames only, for checking
     python studio/reels/arjun_outfit.py studio/work/arjun --only s07_balance_problem
 
-Inputs in <work>: assets/*.png, voice/narration.wav, voice/words.json, silhouette.json, landmarks.json.
+Inputs in <work>: assets/*.png, voice/narration.wav, voice/words.json, silhouette.json, landmarks.json,
+clips/g1_clean.mp4 + clips/g3_clean.mp4 (Gemini clips, watermark removed), clips/clips.json (alignments),
+clips/g3_bridge.json (face scale/position either side of g3's ghosting, for the pull-back bridge).
 """
 import argparse
 import json
@@ -16,8 +18,9 @@ import numpy as np
 import soundfile as sf
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+from render import ease_in_out  # noqa: E402
 from render import (  # noqa: E402
-    INK, PAPER, W, H, Img, Scene, badge, caption, caption_at, caption_chunks, clamp, find_word, font, join, logo_mark,
+    Clip, INK, PAPER, W, H, Img, Scene, badge, caption, caption_at, caption_chunks, clamp, find_word, font, join, logo_mark,
     measure_line, mono_label, paint, polyline, prog, render_scene, scan_grid, swatch_row, text_center, tiles, title_card,
     title_top, wipe, zoom_point, ACCENT,
 )
@@ -25,7 +28,11 @@ from render import (  # noqa: E402
 HOOK, ENDCARD, LEAD_PAD = 0.9, 2.8, 0.2
 # How long before its word each scan-line wipe starts, so the line reaches the garment on the word.
 # (The top of each before/after pair is identical — backdrop and head — so the visible change is on the clothes.)
-WIPE_LEAD = {"fit": 0.47, "balance": 0.6, "colour": 0.43}
+WIPE_LEAD = {"fit": 0.47}
+# Gemini clips (watermark removed with studio/lib/unwatermark.py, aligned with studio/lib/align.py → clips/clips.json)
+G1_SPEED, G1_MORPH, G1_ANKLES, G1_SHOES = 4.5, 1.05, 4.75, 6.0   # trousers morph at 4.5×: first visible change (1.05 s) on "Straight-leg", thighs on "chinos"
+G3_START, G3_GHOST, G3_CLEAN = 1.1, 1.35, 2.0   # colour morph: first visible change (1.1 s) on "Olive"; Gemini ghosting 1.35–2.0 s is cut out
+G3_BRIDGE = 0.6                                                   # seconds for the measured pull-back that replaces it
 LEAD = HOOK + LEAD_PAD  # narration starts here in the final reel
 TITLE = "Arjun’s Outfit Glowup"
 
@@ -36,6 +43,20 @@ def build(work: Path):
     full = ["img1_before", "img2_fit", "img3_balance", "img5_after_studio"]
     img = {k: Img(A / f"{k}.png", fit=FULL if k in full else 1.0) for k in full + ["img1b_pulling_closeup", "img4a_black", "img4b_olive", "img6_after_cafe"]}
     grey = {k: Img(A / f"{k}.png", grey=True, fit=0.78) for k in ["img1_before", "img2_fit", "img3_balance"]}
+    cj = json.loads((work / "clips" / "clips.json").read_text())
+    _clips: dict = {}
+
+    def clip(name):
+        if name not in _clips:
+            C = work / "clips"
+            spec = {
+                "g1": (C / "g1_clean.mp4", 0.9, 8.5, FULL, cj["g1"]["matrix"]),
+                "g3a": (C / "g3_clean.mp4", 0.8, 6.0, 1.0, cj["g3"]["matrix"]),
+                "g3b": (C / "g3_clean.mp4", 10.0, 20.0, 1.0, None),
+            }[name]
+            _clips[name] = Clip(spec[0], spec[1], spec[2], fit=spec[3], align=spec[4])
+        return _clips[name]
+
     sil = json.loads((work / "silhouette.json").read_text())
     lmk = json.loads((work / "landmarks.json").read_text())
     words = json.loads((work / "voice" / "words.json").read_text())
@@ -64,7 +85,7 @@ def build(work: Path):
     b |= {"t_colour": w("And", after=b["bal_fix"]) - CUT}
     b |= {
         "col_problem": w("Arjun", after=b["t_colour"]) - CUT,
-        "col_fix": w("Olive") - 0.4,
+        "col_fix": w("Olive") - 0.15,
         "payoff": w("Same") - CUT,
         "end": LEAD + narr_len + 0.5,
     }
@@ -92,7 +113,7 @@ def build(work: Path):
 
     def zp(x, y, z, k="img1_before"):
         """Point measured on the cover-fitted image k → canvas, including the image's fit and the zoom."""
-        return zoom_point(*img[k].map(x, y), z, *ZC)
+        return zoom_point(*img[k if k in img else "img2_fit"].map(x, y), z, *ZC)
 
     # ------------------------------------------------------------ scenes
     scenes = []
@@ -102,7 +123,7 @@ def build(work: Path):
 
     # S0 hook: the payoff first
     def hook(ctx, t, T, ta):
-        paint(ctx, img["img6_after_cafe"], 1.06 - 0.02 * t / T, W / 2, 760)
+        paint(ctx, clip("g3b").at(18.0 + t), 1.05, W / 2, 760)
         g = __import__("cairo").LinearGradient(0, 0, 0, 900)
         g.add_color_stop_rgba(0, 0, 0, 0, 0.6)
         g.add_color_stop_rgba(1, 0, 0, 0, 0)
@@ -235,27 +256,30 @@ def build(work: Path):
 
     add("s07_balance_problem", b["bal_problem"], b["bal_fix"], bal_problem)
 
-    # S8 balance fix: wipe to straight-leg chinos; outline straightens; tiles
+    # S8 balance fix: the Gemini morph (skinny jeans → straight chinos) at G1_SPEED, starting on "Straight-leg";
+    # the outline lines switch to the measured after-widths once the morph reaches the ankles
     def bal_fix(ctx, t, T, ta):
-        t_w, t_b = w("chinos") - WIPE_LEAD["balance"] - ta + t, w("balance") - ta + t
+        t_sl, t_b = w("Straight-leg", alts=("Straight", "Straightleg")) - ta + t, w("balance") - ta + t
+        t_shoes = t_sl + (G1_SHOES - G1_MORPH) / G1_SPEED
+        c = G1_MORPH + G1_SPEED * (t - t_sl) if t < t_shoes else G1_SHOES + (t - t_shoes)
         z = 1.0 + 0.03 * t / max(T, 0.01)
-        a, bb = img["img2_fit"], img["img3_balance"]
-        wipe(ctx, a, bb, prog(t, t_w, 0.8), z, *ZC)
-        done = t >= t_w + 0.6
-        s0, s1, a0, a1, r = leg_geometry("img3_balance" if done else "img2_fit", z)
+        fr = clip("g1").at(c)
+        paint(ctx, fr, z, *ZC)
+        done = c >= G1_ANKLES
+        k = "clip_g1_after" if done else "clip_g1_before"
+        s0, s1, a0, a1, r = leg_geometry(k, z)
         col = (0.55, 0.95, 0.65) if done else (1, 0.42, 0.38)
         measure_line(ctx, s0[0], s1[0], s0[1], 1.0, "SHOULDERS")
         polyline(ctx, [s0, a0], 1.0, col, 4.5)
         polyline(ctx, [s1, a1], 1.0, col, 4.5)
-        kk = "img3_balance" if done else "img2_fit"
         for side in "LR":
             x0, x1, _ = r["ankle" + side]
-            p0, p1 = zp(x0, r["ankleY"], z, kk), zp(x1, r["ankleY"], z, kk)
+            p0, p1 = zp(x0, r["ankleY"], z, k), zp(x1, r["ankleY"], z, k)
             measure_line(ctx, p0[0], p1[0], p0[1], 1.0, "", col)
         badge(ctx, "BALANCED", True, t - t_b)
-        tiles(ctx, (a, (190, 1020, 700, 700), "SKINNY"), (bb, (190, 1020, 700, 700), "STRAIGHT LEG"), t - t_b + 0.2, 0.7, y=1180)
+        tiles(ctx, (img["img2_fit"], (190, 1020, 700, 700), "SKINNY"), (img["img3_balance"], (190, 1020, 700, 700), "STRAIGHT LEG"), t - t_b + 0.2, 0.7, y=1180)
         brand(ctx)
-        cap(ctx, ta, bb if done else a)
+        cap(ctx, ta, fr)
 
     add("s08_balance_fix", b["bal_fix"], b["t_colour"], bal_fix)
     add("s09_title_colour", b["t_colour"], b["col_problem"], card("THIRD", "COLOUR", "img3_balance"))
@@ -272,16 +296,47 @@ def build(work: Path):
 
     add("s10_colour_problem", b["col_problem"], b["col_fix"], col_problem)
 
-    # S11 colour fix: wipe to olive + stone; best colours appear on their words
+    # S11 colour fix: the Gemini morph (black tee → stone tee + olive overshirt), starting on "Olive".
+    # Gemini's ghosting stretch (G3_GHOST → G3_CLEAN) is cut; across the gap the camera also pulls back, so the
+    # bridge is a measured pull-back: the later frame starts scaled/positioned so the face matches the held
+    # frame exactly (eye spacing and eye midpoint from Face Mesh, clips/g3_bridge.json), cross-fades in, and
+    # eases out to its natural framing.
+    bridge = json.loads((work / "clips" / "g3_bridge.json").read_text())
+    (eh, dh), (ea, da) = bridge[str(G3_GHOST)], bridge[str(G3_CLEAN)]
+    K0 = dh / da
+
     def col_fix(ctx, t, T, ta):
-        a, bb = img["img4a_black"], img["img4b_olive"]
+        g = clip("g3a")
+        t_ol = w("Olive") - ta + t
+        t_a = t_ol + (G3_GHOST - G3_START)
         zz = 1.04 + 0.03 * t / max(T, 0.01)
-        wipe(ctx, a, bb, prog(t, w("Olive") - WIPE_LEAD["colour"] - ta + t, 0.7), zz, W / 2, 700)
-        t_ol, t_ca, t_te, t_gl = (w(x) - ta + t for x in ("Olive", "camel", "terracotta", "glow"))
+        if t < t_a:
+            fr = g.at(G3_START + (t - t_ol))
+            paint(ctx, fr, zz, W / 2, 700)
+        else:
+            fr = g.at(G3_CLEAN + (t - t_a))
+            u = ease_in_out((t - t_a) / G3_BRIDGE)
+            K = K0 + (1 - K0) * u
+            px, py = eh[0] + (ea[0] - eh[0]) * u, eh[1] + (ea[1] - eh[1]) * u
+            ctx.save()
+            ctx.translate(W / 2, 700)
+            ctx.scale(zz, zz)
+            ctx.translate(-W / 2, -700)
+            if u < 1:
+                ctx.set_source_surface(g.at(G3_GHOST).surface, 0, 0)
+                ctx.paint()
+            ctx.translate(px, py)
+            ctx.scale(K, K)
+            ctx.translate(-ea[0], -ea[1])
+            ctx.set_source_surface(fr.surface, 0, 0)
+            ctx.get_source().set_filter(__import__("cairo").FILTER_GOOD)
+            ctx.paint_with_alpha(clamp((t - t_a) / 0.25))
+            ctx.restore()
+        t_ca, t_te, t_gl = (w(x) - ta + t for x in ("camel", "terracotta", "glow"))
         swatch_row(ctx, [("Olive", "#708238", t - t_ol), ("Camel", "#c19a6b", t - t_ca), ("Terracotta", "#c8644a", t - t_te), ("Warm teal", "#2f7f7a", t - t_te - 0.25)], True, 1330, size=140)
         badge(ctx, "WARM COLOURS", True, t - t_gl)
         brand(ctx)
-        cap(ctx, ta, bb)
+        cap(ctx, ta, fr)
 
     add("s11_colour_fix", b["col_fix"], b["payoff"], col_fix)
 
@@ -290,18 +345,16 @@ def build(work: Path):
 
     def payoff(ctx, t, T, ta):
         if ta < t_follow - 0.1:
-            im = img["img5_after_studio"]
-            paint(ctx, im, 1.0 + 0.05 * clamp(t / max(t_follow - b["payoff"], 0.1)), *ZC)
+            im = clip("g3b").at(10.5 + t)  # final look: sleeve, folded arms, turn, smile
+            paint(ctx, im, 1.0 + 0.03 * clamp(t / max(t_follow - b["payoff"], 0.1)), W / 2, 800)
         else:
-            im = img["img6_after_cafe"]
             k = ta - (t_follow - 0.1)
-            paint(ctx, im, 1.02 + 0.03 * clamp(k / 2.5), W / 2, 760)
+            im = clip("g3b").at(15.05 + k)  # café walk
+            paint(ctx, im, 1.02 + 0.02 * clamp(k / 2.5), W / 2, 760)
             # brief flash-cut feel
             if k < 0.12:
                 ctx.set_source_rgba(1, 1, 1, 0.35 * (1 - k / 0.12))
                 ctx.paint()
-        if ta < t_follow - 0.1:
-            title_top(ctx, TITLE, im, alpha=prog(t, 0.2, 0.4))
         brand(ctx)
         cap(ctx, ta, im)
 
@@ -316,7 +369,7 @@ def build(work: Path):
         import cv2
 
         if blur is None:
-            bgr = cv2.GaussianBlur(img["img6_after_cafe"].bgr, (0, 0), 28)
+            bgr = cv2.GaussianBlur(clip("g3b").at(19.9).bgr, (0, 0), 28)
             blur = Img.__new__(Img)
             blur.bgr = bgr
             bgra = np.ascontiguousarray(cv2.cvtColor(bgr, cv2.COLOR_BGR2BGRA))
@@ -368,8 +421,9 @@ def build(work: Path):
         {"name": "badge PULLING AT CHEST", "t": q(w("pull")), "word": w("pull"), "region": BADGE},
         {"name": "badge LOOSE AT WAIST", "t": q(w("balloon")), "word": w("balloon"), "region": BADGE},
         {"name": "wipe reaches shirt on 'athletic'", "t": q(w("athletic")), "word": w("athletic"), "region": [180, 640, 720, 420]},
-        {"name": "wipe reaches legs on 'chinos'", "t": q(w("chinos")), "word": w("chinos"), "region": [260, 1180, 560, 420]},
-        {"name": "wipe reaches shirt on 'Olive'", "t": q(w("Olive")), "word": w("Olive"), "region": [80, 1180, 920, 500]},
+        {"name": "trousers start changing on 'Straight-leg'", "t": q(w("Straight-leg", alts=("Straight",))), "word": w("Straight-leg", alts=("Straight",)), "region": [330, 1040, 420, 160]},
+        {"name": "thighs turn khaki on 'chinos'", "t": q(w("chinos")), "word": w("chinos"), "region": [330, 1180, 420, 260]},
+        {"name": "tee starts changing on 'Olive'", "t": q(w("Olive")), "word": w("Olive"), "region": [140, 1250, 800, 300]},
         {"name": "badge TOP-HEAVY", "t": q(w("huge")), "word": w("huge"), "region": BADGE},
         {"name": "badge BALANCED", "t": q(w("balance")), "word": w("balance"), "region": BADGE},
         {"name": "badge WARM UNDERTONE", "t": q(w("warm")), "word": w("warm"), "region": BADGE},

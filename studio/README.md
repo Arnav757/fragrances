@@ -53,6 +53,10 @@ python studio/lib/voice.py studio/reels/arjun_outfit.lines.txt $W/voice --prompt
 python studio/lib/timeline.py $W/voice                 # word timestamps, checked against the script
 python studio/lib/facemap.py $W/landmarks.json $W/assets/*.png                              # pose + face points
 PYTHONPATH=studio/lib python studio/lib/silhouette.py $W img1_before img2_fit img3_balance img5_after_studio  # outline widths
+# Gemini/Veo clips → work/clips/g1.mp4, g3.mp4: remove the corner sparkle, then align each clip to its still
+python studio/lib/unwatermark.py estimate $W/clips/g1.mp4 $W/clips/g3.mp4 $W/clips/wm_alpha.npy --box 576 1136 48 48
+python studio/lib/unwatermark.py apply $W/clips/g1.mp4 $W/clips/g1_clean.mp4 $W/clips/wm_alpha.npy --box 576 1136 48 48
+PYTHONPATH=studio/lib python studio/lib/align.py $W $W/clips/g1_clean.mp4 0.9 img2_fit pose    # → clips/clips.json
 python studio/reels/arjun_outfit.py $W --stills        # look at key frames first
 python studio/reels/arjun_outfit.py $W                 # render: per-scene encode → join → audio
 python studio/lib/verify_sync.py $W/render/arjun_outfit_glowup.mp4 $W/render/events.json  # ±80 ms check

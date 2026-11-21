@@ -7,6 +7,8 @@
 | `facemap.py` | MediaPipe Pose (33 points) + Face Mesh (478 points) per image, in output-canvas pixels → `landmarks.json`. |
 | `silhouette.py` | Body-outline widths from MediaPipe segmentation (shoulders, waist, knees, ankles) for measurement overlays. |
 | `render.py` | pycairo primitives in the series style (captions, badges with drawn ✓/✗, title cards, measurement lines, tiles + cursor, swatches, scan-line wipes, logo) and the video-making flow: one encode per scene → concat `-c copy` → audio last. |
+| `unwatermark.py` | Removes a static semi-transparent corner mark from generated clips: reverse-blends it (keeps real texture underneath) on textured areas, inpaints it on flat ones. |
+| `align.py` | Similarity transform that maps a generated clip onto the still it came from (body or face points), so still → clip cuts don't jump. |
 | `verify_sync.py` | Measures when each event actually appears in the final video and compares it with its spoken word; fails outside ±80 ms. |
 
 Reel timelines live in `../reels/` (e.g. `arjun_outfit.py`); every scene boundary and animation is anchored to a word.

@@ -66,8 +66,8 @@ class Img:
     cover-fitted image (landmarks.json / silhouette.json) into canvas pixels.
     """
 
-    def __init__(self, path: str | Path, grey: bool = False, fit: float = 1.0):
-        bgr = cover(cv2.imread(str(path)))
+    def __init__(self, path: str | Path | None = None, grey: bool = False, fit: float = 1.0, bgr: np.ndarray | None = None):
+        bgr = cover(cv2.imread(str(path))) if bgr is None else bgr
         self.fit, self.ox, self.oy = fit, 0.0, 0.0
         if fit < 1.0:
             small = cv2.resize(bgr, (round(W * fit), round(H * fit)), interpolation=cv2.INTER_AREA)
@@ -94,6 +94,40 @@ class Img:
 
     def luminance(self, x0: int, y0: int, x1: int, y1: int) -> float:
         return float(cv2.cvtColor(self.bgr[y0:y1, x0:x1], cv2.COLOR_BGR2GRAY).mean() / 255)
+
+
+class Clip:
+    """Frames [start, end] (seconds) of a video, cover-fitted, optionally aligned to a still with a similarity
+    transform (2×3 matrix in canvas pixels), then placed like Img (fit/headroom). at(c) returns an Img for clip
+    time c (nearest source frame). Only the needed range is decoded and kept in memory."""
+
+    def __init__(self, path: str | Path, start: float, end: float, fit: float = 1.0, align: list | None = None):
+        cap = cv2.VideoCapture(str(path))
+        self.fps = cap.get(cv2.CAP_PROP_FPS)
+        self.start = start
+        i0, i1 = int(start * self.fps), int(end * self.fps) + 1
+        cap.set(cv2.CAP_PROP_POS_FRAMES, i0)
+        M = np.array(align, np.float32) if align is not None else None
+        self.frames: list[np.ndarray] = []
+        for _ in range(i0, i1):
+            ok, f = cap.read()
+            if not ok:
+                break
+            f = cover(f)
+            if M is not None:
+                f = cv2.warpAffine(f, M, (W, H), flags=cv2.INTER_LANCZOS4, borderMode=cv2.BORDER_REPLICATE)
+            self.frames.append(f)
+        self.fit = fit
+        self._cache: tuple[int, Img] | None = None
+
+    def index(self, c: float) -> int:
+        return max(0, min(len(self.frames) - 1, round((c - self.start) * self.fps)))
+
+    def at(self, c: float) -> Img:
+        i = self.index(c)
+        if self._cache is None or self._cache[0] != i:
+            self._cache = (i, Img(bgr=self.frames[i].copy(), fit=self.fit))
+        return self._cache[1]
 
 
 def paint(ctx: cairo.Context, img: Img, zoom: float = 1.0, cx: float = W / 2, cy: float = H / 2, alpha: float = 1.0):
