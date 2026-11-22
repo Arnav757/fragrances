@@ -35,8 +35,8 @@ Leave visible logos (team caps, polo-player emblems) out of prompts: use plain, 
 | A. Riviera shirting | R1, R2, R3, R5, R7, R8, R18, R24 | classic / smart_casual | date, office_casual, weekend |
 | B. Quiet knitwear | R6, R9, R11, R12, R15, R16, R19, R23 | minimal / smart_casual | office_casual, weekend, travel |
 | C. Dark tonal minimal | R10, R13, R17, R20, R22 | minimal | date, office_casual |
-| D. Easy summer / Americana | R4, R14, R21, R25, R26 |
-| E. Indo-Western occasion | R27, R28, R29, R30 | fusion / classic | festive, date, office_formal | street / minimal | weekend, travel |
+| D. Easy summer / Americana | R4, R14, R21, R25, R26 | street / minimal | weekend, travel |
+| E. Indo-Western occasion | R27, R28, R29, R30 | fusion / classic | festive, date, office_formal |
 
 ### A. Riviera shirting
 A shirt (linen, oxford or gingham), worn open at the neck with sleeves rolled, over long trousers.
@@ -96,6 +96,27 @@ A soft crewneck over a visible layer, with wide trousers or jeans.
   boots · hands in pockets.
 - **R14** Boxy black tee · olive-charcoal linen drawstring wide trousers · black flip-flops · white
   canvas tote.
+- **R21** White long-sleeve henley, sleeves pushed up · mid-wash vintage straight jeans · black
+  flip-flops · brown leather tote · dark cap, sunglasses, thin bracelet.
+- **R25** Off-white slub long-sleeve henley, boxy · mid-wash flared jeans · brown loafers · dark brown
+  suede shoulder bag · red-brown tinted sunglasses.
+- **R26** Heather grey fitted crew tee, tucked · taupe double-pleated wide trousers · black penny
+  loafers · steel rectangular watch, silver bracelet, thin chain. The smartest version of a tee.
+
+Recurring piece: the **long-sleeve henley** (R20, R21, R25) works in lanes C and D.
+
+### E. Indo-Western occasion
+Our festive and formal lane. Same house rules: long straight or wide trousers, clean mandarin
+collars, quiet colour with one detail (pocket square, brooch, gold buttons).
+
+- **R27** White linen Nehru jacket over a blue-and-white pinstripe kurta-shirt, sleeves rolled ·
+  white straight trousers · mustard printed pocket square · black watch, silver rings.
+- **R28** Olive kurta with a keyhole neck and small gold buttons, sleeves pushed up · matching olive
+  straight wide trousers (tonal co-ord) · black leather slides · dark sunglasses · black clutch.
+- **R29** Black long bandhgala jacket with a mandarin collar, white shirt collar showing above it ·
+  white flower brooch · black straight trousers · black patent shoes. Premiere-night formal.
+- **R30** Ivory bandhgala with gold buttons · navy printed pocket square · black trousers · gold
+  watch. Wedding-guest formal.
 
 ## Prompt building blocks
 
