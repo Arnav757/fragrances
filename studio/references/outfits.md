@@ -5,8 +5,9 @@ prompts or reel scripts. **Take the clothes, fits, colours and styling from thes
 people:** several photos show real, recognisable men. Prompts describe garments on our own characters
 (Arjun, Kabir, …) only.
 
-Refs are numbered in the order they were sent (R1–R15). The first five are saved locally in
-`studio/work/references/` (git-ignored, since they're other people's photos).
+Refs are numbered in the order they were sent (R1–R20). R1–R5 and R16–R20 are saved locally as
+`studio/work/references/r<N>.*` (git-ignored, since they're other people's photos).
+Leave visible logos (team caps, polo-player emblems) out of prompts: use plain, unbranded versions.
 
 ## The house look (true of almost every ref)
 
@@ -15,7 +16,8 @@ Refs are numbered in the order they were sent (R1–R15). The first five are sav
 2. **Short or tucked top.** Tops are tucked, half-tucked, or cut boxy and stop at the belt, so the
    legs read long. Rise is natural to high.
 3. **Leather on the feet.** Loafers (plain or woven), derbies, Chelsea or Western boots in black,
-   cognac, burgundy or tan suede. No chunky sneakers.
+   cognac, burgundy or tan suede. The one exception is a slim, clean white leather sneaker (R19).
+   No chunky sneakers.
 4. **Quiet palette.** Indigo, light blue, navy, charcoal, grey, black, white, ecru. Colour comes from
    brown leather accents, never from loud prints. Patterns stay small: gingham, pinstripe.
 5. **One texture piece.** Linen shirt, slub cotton tee or a fuzzy knit carries the outfit.
@@ -29,9 +31,9 @@ Refs are numbered in the order they were sent (R1–R15). The first five are sav
 
 | Lane | Refs | Engine style | Best occasions |
 |---|---|---|---|
-| A. Riviera shirting | R1, R2, R3, R5, R7, R8 | classic / smart_casual | date, office_casual, weekend |
-| B. Quiet knitwear | R6, R9, R11, R12, R15 | minimal / smart_casual | office_casual, weekend, travel |
-| C. Dark tonal minimal | R10, R13 | minimal | date, office_casual |
+| A. Riviera shirting | R1, R2, R3, R5, R7, R8, R18 | classic / smart_casual | date, office_casual, weekend |
+| B. Quiet knitwear | R6, R9, R11, R12, R15, R16, R19 | minimal / smart_casual | office_casual, weekend, travel |
+| C. Dark tonal minimal | R10, R13, R17, R20 | minimal | date, office_casual |
 | D. Easy summer / Americana | R4, R14 | street / minimal | weekend, travel |
 
 ### A. Riviera shirting
@@ -50,6 +52,8 @@ A shirt (linen, oxford or gingham), worn open at the neck with sleeves rolled, o
   gold chain with pendant · tortoiseshell sunglasses hooked in the placket.
 - **R8** Pale blue shirt, three buttons open, sleeves pushed up, tucked · navy pinstripe wide-leg
   trousers · black belt · black penny loafers · thin chain · dark sunglasses.
+- **R18** Black short-sleeve fine-knit polo, fitted and tucked · burgundy leather belt · mid-wash
+  flared jeans · black boots · steel watch, chain bracelet. The knit-polo version of the lane.
 
 ### B. Quiet knitwear
 A soft crewneck over a visible layer, with wide trousers or jeans.
@@ -64,12 +68,20 @@ A soft crewneck over a visible layer, with wide trousers or jeans.
   shoes · thin metal glasses.
 - **R15** Charcoal crewneck, white tee neckline showing · ecru wide jeans · black Chelsea boots ·
   silver rings.
+- **R16** Light grey boxy cropped crewneck, white tee hem showing · light-wash baggy wide jeans ·
+  black loafers · plain black baseball cap · dark sunglasses. The most relaxed version of the lane.
+- **R19** Stone cable-knit polo-collar sweater with a quarter zip, white tee at the neck · black
+  pleated wide trousers · slim white leather sneakers · steel watch, silver ring.
 
 ### C. Dark tonal minimal
 - **R13** All black: fine-knit crewneck · black pleated wide trousers pooling over the shoe · black
   derbies · black leather tote · dark rectangular sunglasses.
 - **R10** Off-white long-sleeve boxy tee · navy pleated wide trousers · dark woven leather loafers ·
   navy cap · aviators · olive tote.
+- **R17** Black wool funnel-neck zip jacket, cropped to the waist · black pleated wide trousers
+  pooling on the shoe · cognac penny loafers · wired earphones.
+- **R20** Black waffle-knit long-sleeve henley · dark-rinse wide jeans · burgundy loafers · steel
+  watch.
 
 ### D. Easy summer / Americana
 - **R4** White slub cotton tee, boxy and short · faded black wide-straight jeans · black leather
