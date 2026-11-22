@@ -76,6 +76,24 @@ Arjun wears: a black slim-fit shirt buttoned all the way to the collar, untucked
 [Location block] wearing exactly the outfit in the second attached image.
 Setting: a city street at blue hour beside a dark parked car and warm restaurant windows, glowing bokeh. He holds dark sunglasses in one hand. Easy smile.
 ```
+**Optional extras: these make the breakdown stronger (about 25 s total)**
+
+**ep1_d_colour_black.png / ep1_e_colour_blue.png:** proof of the colour claim. Use the same framing for both.
+```
+[Studio block, but framing: head-and-shoulders close-up, straight on, same light]
+D: Arjun in the black shirt buttoned to the collar. Keep the light slightly cool-neutral so the black sits flat and harsh against his skin.
+E: identical framing and light; Arjun in the pale blue shirt with the top three buttons open and a thin gold chain. Only the clothes change, not his skin.
+```
+**ep1_f_hem.png:** proof of the leg-line rule.
+```
+[Studio block, but framing: close-up from the knee down, straight on, same floor and light]
+The navy pinstripe wide trouser hem falling over a dark brown leather penny loafer, with a soft single break at the front; the fabric drapes straight with no bunching.
+```
+- `v1_colour.mp4` (D → E, first + last frame, 3 s): *Locked-off head-and-shoulders. The black shirt lightens to pale blue and the collar falls open; his skin looks warmer and more even. Face identity unchanged.*
+
+These slot in after "On warm skin, black looks harsh" (D → E), and after "navy pinstripe wide
+trousers" (F, 1.5 s).
+
 **Clips**
 - `v1_morph.mp4` (A → B, 4 s): *Locked-off static camera. He stands still while the outfit smoothly re-tailors: the black shirt lightens to pale blue, opens at the collar, tucks in and its sleeves roll up; the skinny jeans widen and lengthen into navy pinstripe trousers falling over his shoes; the sneakers become brown loafers. Face and pose identical.*
 - `v1_detail.mp4` (B, 5 s): *Slow push-in from full length to waist. He rolls one sleeve a little higher, then runs a thumb along the belt. Realistic fabric.*
