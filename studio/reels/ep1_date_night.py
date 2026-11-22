@@ -33,6 +33,27 @@ GEM_SHIRT = (1.0, 2.3)
 GEM_TROUSERS = (3.5, 5.0)
 
 
+def swatch_col(ctx, items, x=150, y0=560, size=112, gap=78):
+    """Small colour chips stacked down the left edge, each popping in at its own time."""
+    from render import mark
+
+    for i, (name, hx, age) in enumerate(items):
+        if age < 0:
+            continue
+        a = prog(age, 0, 0.25)
+        y = y0 + i * (size + gap) + (1 - a) * 20
+        r_, g_, b_ = (int(hx[k : k + 2], 16) / 255 for k in (1, 3, 5))
+        rounded(ctx, x - size / 2, y, size, size, 20)
+        ctx.set_source_rgba(r_, g_, b_, a)
+        ctx.fill_preserve()
+        ctx.set_source_rgba(1, 1, 1, 0.95 * a)
+        ctx.set_line_width(3)
+        ctx.stroke()
+        mark(ctx, True, x + size / 2 - 6, y + 6, 15, a)
+        font(ctx, "IBM Plex Mono", 21, bold=True)
+        text_center(ctx, name.upper(), x, y + size + 32, INK, alpha=a, tracking=1.5)
+
+
 def body_points(bgr):
     """Shoulder and ankle outline points (canvas pixels of the cover-fitted image) from MediaPipe pose + segmentation."""
     import mediapipe as mp
@@ -136,18 +157,25 @@ def build(work: Path, variant: str):
     # S0 hook + title: the finished fit on location ("Arjun's date night fit.")
     def hook(ctx, t, T, ta):
         paint(ctx, loc, 1.08 - 0.05 * clamp(t / T), W / 2, 900)
-        g = cairo.LinearGradient(0, 0, 0, 820)
-        g.add_color_stop_rgba(0, 0, 0, 0, 0.62)
+        g = cairo.LinearGradient(0, 1050, 0, H)
+        g.add_color_stop_rgba(0, 0, 0, 0, 0)
+        g.add_color_stop_rgba(0.45, 0, 0, 0, 0.6)
+        g.add_color_stop_rgba(1, 0, 0, 0, 0.75)
+        ctx.set_source(g)
+        ctx.rectangle(0, 1050, W, H - 1050)
+        ctx.fill()
+        g = cairo.LinearGradient(0, 0, 0, 300)
+        g.add_color_stop_rgba(0, 0, 0, 0, 0.5)
         g.add_color_stop_rgba(1, 0, 0, 0, 0)
         ctx.set_source(g)
-        ctx.rectangle(0, 0, W, 820)
+        ctx.rectangle(0, 0, W, 300)
         ctx.fill()
         a1, a2 = prog(t, 0.0, 0.3), prog(t, w("date") - ta + t - 0.05, 0.3)
         font(ctx, "Playfair Display", 92, italic=True)
-        text_center(ctx, "Arjun’s", W / 2, 330, (1, 1, 1), alpha=a1, shadow=True)
+        text_center(ctx, "Arjun’s", W / 2, 1400, (1, 1, 1), alpha=a1, shadow=True)
         font(ctx, "Syne", 118, bold=True)
-        text_center(ctx, "DATE NIGHT", W / 2, 465, (1, 1, 1), alpha=a2, shadow=True, tracking=3)
-        text_center(ctx, "FIT", W / 2, 590, (1, 1, 1), alpha=prog(t, w("fit") - ta + t - 0.05, 0.3), shadow=True, tracking=3)
+        text_center(ctx, "DATE NIGHT", W / 2, 1535, (1, 1, 1), alpha=a2, shadow=True, tracking=3)
+        text_center(ctx, "FIT", W / 2, 1660, (1, 1, 1), alpha=prog(t, w("fit") - ta + t - 0.05, 0.3), shadow=True, tracking=3)
         mono_label(ctx, "EPISODE 01 · ARJUN IS AN AI-GENERATED CHARACTER", W / 2, 205, (1, 1, 1), alpha=0.7 * a1, size=19)
         brand(ctx)
 
@@ -165,8 +193,10 @@ def build(work: Path, variant: str):
     # S2 colour problem: black against warm skin, close up
     def colour(ctx, t, T, ta):
         paint(ctx, face_b, 1.02 + 0.04 * t / T, W / 2, 700)
-        badge(ctx, "WARM UNDERTONE", None, ta - w("warm"))
-        swatch_row(ctx, [("Jet black", "#0a0a0a", ta - w("black", 2))], False, 1330, crossed=prog(ta, w("harsh"), 0.35))
+        if ta < w("harsh") - 0.05:
+            badge(ctx, "WARM UNDERTONE", None, ta - w("warm"))
+        else:
+            badge(ctx, "BLACK LOOKS HARSH", False, ta - w("harsh"))
         brand(ctx)
         cap(ctx, ta)
 
@@ -196,14 +226,14 @@ def build(work: Path, variant: str):
     # S4–S5 the fix. gpt: two-stage scan wipe (shirt on "pale", trousers on "navy"); gem: the Gemini morph,
     # time-remapped so the shirt changes on "pale" and the trousers on "navy".
     t_pale, t_navy = w("pale"), w("navy")
-    SHIRT_Y, LEG_Y = 1010, H + 60  # wipe stops just below the belt, then finishes the legs
+    SHIRT_Y, LEG_Y = 1150, H + 60  # wipe stops just below the belt, then finishes the legs
 
     def fix_frame(ta):
         if variant == "gem":
-            if ta < t_pale:
+            if ta < t_pale - 0.08:
                 c = GEM_SHIRT[0]
             elif ta < t_navy - 0.1:
-                c = min(GEM_SHIRT[1], GEM_SHIRT[0] + (ta - t_pale) * 1.15)
+                c = min(GEM_SHIRT[1], GEM_SHIRT[0] + (ta - (t_pale - 0.08)) * 1.7)
             else:
                 c = min(10.0, GEM_TROUSERS[0] + (ta - (t_navy - 0.1)) * 1.3)
                 if c > GEM_TROUSERS[1]:
@@ -262,7 +292,7 @@ def build(work: Path, variant: str):
             k = ta - (t_wide + 0.25)
             u = ease_in_out(clamp(k / 0.8))
             fr = fix_frame(ta)
-            paint(ctx, fr, 1.0 + 0.9 * u, W / 2, 1000 + 700 * u)
+            paint(ctx, fr, 1.0 + 0.75 * u, W / 2, 1000 + 830 * u)
             badge(ctx, "HEM ON THE SHOE", True, k - 0.5)
         else:
             fix(ctx, t, T, ta)
@@ -277,11 +307,7 @@ def build(work: Path, variant: str):
         im = clip.at(5.2 + t * 0.8) if clip else after
         paint(ctx, im, 1.0 + 0.03 * t / T, *ZC)
         t_b1, t_b2 = w("belt"), w("loafers")
-        swatch_row(
-            ctx,
-            [("Pale blue", "#c9d8ee", ta - (L[6] + 0.05)), ("Navy", "#1f2a44", ta - (L[6] + 0.2)), ("Brown", "#5b3a26", ta - t_b1)],
-            True, 300, size=130,
-        )
+        swatch_col(ctx, [("Pale blue", "#c9d8ee", ta - (L[6] + 0.05)), ("Navy", "#1f2a44", ta - (L[6] + 0.2)), ("Brown", "#5b3a26", ta - t_b1)])
         badge(ctx, "BROWN LEATHER", True, ta - t_b2)
         t_f = w("face")
         tiles(ctx, (face_b, (240, 260, 600, 600), "BLACK"), (face_e, (240, 260, 600, 600), "PALE BLUE"), ta - (w("Nothing") - 0.05), t_f - w("Nothing") + 0.3, y=1250)
@@ -293,13 +319,13 @@ def build(work: Path, variant: str):
     # S7 payoff on location
     def payoff(ctx, t, T, ta):
         paint(ctx, loc, 1.0 + 0.06 * ease_in_out(t / T), W / 2, 950)
-        if ta < w("Date") - 0.05:
+        if ta < w("Date", after=L[7]) - 0.05:
             if ta < w("balanced"):
                 badge(ctx, "LONG LEG LINE", True, ta - w("Long"))
             else:
                 badge(ctx, "BALANCED SHOULDERS", True, ta - w("balanced"))
         else:
-            badge(ctx, "DATE READY", True, ta - w("Date"))
+            badge(ctx, "DATE READY", True, ta - w("Date", after=L[7]))
         if t < 0.12:
             ctx.set_source_rgba(1, 1, 1, 0.3 * (1 - t / 0.12))
             ctx.paint()
@@ -349,8 +375,10 @@ def build(work: Path, variant: str):
     FULL_R, BADGE = [0, 0, W, H], [300, 80, 480, 60]
     events = [{"name": f"cut → {s.name}", "t": s.start, "region": FULL_R} for s in scenes[1:] if s.name not in ("s05_trousers",)]
     for tok, nth, name in [("black", 1, "badge ALL BLACK"), ("warm", 1, "badge WARM UNDERTONE"), ("huge", 1, "badge TOP-HEAVY"),
-                           ("shirt", 1, "badge PALE BLUE SHIRT"), ("loafers", 1, "badge BROWN LEATHER"), ("Date", 1, "badge DATE READY")]:
+                           ("shirt", 1, "badge PALE BLUE SHIRT"), ("loafers", 1, "badge BROWN LEATHER")]:
         events.append({"name": name, "t": q(w(tok, nth)), "word": w(tok, nth), "region": BADGE})
+    t_dr = w("Date", after=L[7])
+    events.append({"name": "badge DATE READY", "t": q(t_dr), "word": t_dr, "region": BADGE})
     events.append({"name": "shirt starts changing on 'pale'", "t": q(t_pale), "word": t_pale, "region": [200, 560, 680, 300]})
     (work / "render" / variant).mkdir(parents=True, exist_ok=True)
     (work / "render" / variant / "events.json").write_text(json.dumps(events, indent=0))
