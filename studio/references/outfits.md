@@ -5,7 +5,7 @@ prompts or reel scripts. **Take the clothes, fits, colours and styling from thes
 people:** several photos show real, recognisable men. Prompts describe garments on our own characters
 (Arjun, Kabir, …) only.
 
-Refs are numbered in the order they were sent (R1–R35). R1–R5 and R16–R35 are saved locally as
+Refs are numbered in the order they were sent (R1–R40). R1–R5 and R16–R40 are saved locally as
 `studio/work/references/r<N>.*` (git-ignored, since they're other people's photos).
 Leave visible logos (team caps, polo-player emblems) out of prompts: use plain, unbranded versions.
 
@@ -38,6 +38,7 @@ Leave visible logos (team caps, polo-player emblems) out of prompts: use plain, 
 | D. Easy summer / Americana | R4, R14, R21, R25, R26 | street / minimal | weekend, travel |
 | E. Indo-Western occasion | R27, R28, R29, R30, R31, R32, R34 | fusion / classic | festive, date, office_formal |
 | F. 70s tailoring | R33, R35 | classic | office_formal, date, festive |
+| G. Street / athleisure | R36, R37, R38, R39, R40 | street | weekend, travel |
 
 ### A. Riviera shirting
 A shirt (linen, oxford or gingham), worn open at the neck with sleeves rolled, over long trousers.
@@ -137,6 +138,23 @@ the shoe.
 - **R35** Grey glen-check single-breasted suit, strong shoulders, flared trousers · black shirt
   buttoned to the collar, no tie · black shoes. Festival photocall.
 
+### G. Street / athleisure
+The one lane that breaks the house rules: sneakers, socks, shorts and logos are allowed. Its own
+rule is **extreme proportion**: either a huge top over short shorts, or a short boxy top over very
+baggy, long denim. One loud accent (hot pink shoes, grass green) in an otherwise neutral outfit.
+Best for younger, trend-led customers; keep it out of office and festive outfits.
+
+- **R36** Run-club crew: grey or black hoodies, grey or black shorts above the knee, white crew socks,
+  matching hot-pink running shoes. A group look, good for a "squad" reel.
+- **R37** Oversized black nylon funnel-neck bomber · short black nylon shorts · white crew socks ·
+  cream retro runners · big grey canvas tote · tinted sunglasses.
+- **R38** Sky-blue boxy graphic tee · light-wash wide jeans · green flip-flops · stacked silver
+  bracelets.
+- **R39** All black: oversized hoodie over a long wide skirt-short · white crew socks · black clogs ·
+  grey beanie · wired earphones. The most experimental ref; use sparingly.
+- **R40** Grass-green boxy knit polo · heavily distressed, very baggy light-wash jeans pooling on the
+  ground · dark sunglasses. (The ref has a cigarette: leave it out.)
+
 ## Prompt building blocks
 
 Copy these into ChatGPT image prompts, after the character description:
@@ -157,6 +175,10 @@ Copy these into ChatGPT image prompts, after the character description:
 
 - Tailoring: `{colour} {chalk-stripe|glen-check} {single|double}-breasted suit with strong shoulders
   and high-rise flared trousers covering the shoes, {shirt}, {tie or open collar}, black shoes`
+
+- Street: `oversized {colour} {hoodie|nylon bomber|boxy tee} over {short nylon shorts with white crew
+  socks|very baggy light-wash jeans pooling on the ground}, {shoe}, one bright {accent} accent,
+  unbranded (no logos or text on clothing)`
 
 Gemini animation cues that suit these looks: a slow walk past the camera so the wide trousers swing;
 rolling up a sleeve; tucking sunglasses into the placket; tugging the knit hem down over the tee.
