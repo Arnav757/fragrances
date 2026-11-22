@@ -5,7 +5,7 @@ prompts or reel scripts. **Take the clothes, fits, colours and styling from thes
 people:** several photos show real, recognisable men. Prompts describe garments on our own characters
 (Arjun, Kabir, …) only.
 
-Refs are numbered in the order they were sent (R1–R30). R1–R5 and R16–R30 are saved locally as
+Refs are numbered in the order they were sent (R1–R35). R1–R5 and R16–R35 are saved locally as
 `studio/work/references/r<N>.*` (git-ignored, since they're other people's photos).
 Leave visible logos (team caps, polo-player emblems) out of prompts: use plain, unbranded versions.
 
@@ -36,7 +36,8 @@ Leave visible logos (team caps, polo-player emblems) out of prompts: use plain, 
 | B. Quiet knitwear | R6, R9, R11, R12, R15, R16, R19, R23 | minimal / smart_casual | office_casual, weekend, travel |
 | C. Dark tonal minimal | R10, R13, R17, R20, R22 | minimal | date, office_casual |
 | D. Easy summer / Americana | R4, R14, R21, R25, R26 | street / minimal | weekend, travel |
-| E. Indo-Western occasion | R27, R28, R29, R30 | fusion / classic | festive, date, office_formal |
+| E. Indo-Western occasion | R27, R28, R29, R30, R31, R32, R34 | fusion / classic | festive, date, office_formal |
+| F. 70s tailoring | R33, R35 | classic | office_formal, date, festive |
 
 ### A. Riviera shirting
 A shirt (linen, oxford or gingham), worn open at the neck with sleeves rolled, over long trousers.
@@ -117,6 +118,24 @@ collars, quiet colour with one detail (pocket square, brooch, gold buttons).
   white flower brooch · black straight trousers · black patent shoes. Premiere-night formal.
 - **R30** Ivory bandhgala with gold buttons · navy printed pocket square · black trousers · gold
   watch. Wedding-guest formal.
+- **R31** Ivory short bandhgala, mandarin collar · deep red rose brooch on the chest · black
+  flared trousers · black shoes · black watch. Evening reception.
+- **R32** Ivory jacquard open-front bandhgala over a tonal embroidered kurta · ivory flared trousers
+  · cognac leather loafers · dark sunglasses. All-ivory co-ord, golden-hour light.
+- **R34** Ivory chikankari-embroidered open jacket over a white embroidered kurta · white straight
+  trousers · thin metal glasses. Mehendi or day-wedding look.
+
+Lane E pattern: **ivory or white on top, a long flared or straight trouser below** (black for evening,
+matching ivory for day), one point of colour (rose, pocket square, gold buttons).
+
+### F. 70s tailoring
+Suits cut like the rest of the library: strong shoulders, high rise, long flared trousers that cover
+the shoe.
+
+- **R33** Navy chalk-stripe double-breasted suit with wide flared trousers · pale pink shirt ·
+  brown silk tie · silver lapel pin and white pocket square · black shoes.
+- **R35** Grey glen-check single-breasted suit, strong shoulders, flared trousers · black shirt
+  buttoned to the collar, no tie · black shoes. Festival photocall.
 
 ## Prompt building blocks
 
@@ -135,6 +154,9 @@ Copy these into ChatGPT image prompts, after the character description:
 
 - Indo-Western: `{colour} {linen|wool} {bandhgala|Nehru jacket|kurta} with a mandarin collar,
   {detail}, over straight full-length {colour} trousers, {black leather slides|black patent shoes}`
+
+- Tailoring: `{colour} {chalk-stripe|glen-check} {single|double}-breasted suit with strong shoulders
+  and high-rise flared trousers covering the shoes, {shirt}, {tie or open collar}, black shoes`
 
 Gemini animation cues that suit these looks: a slow walk past the camera so the wide trousers swing;
 rolling up a sleeve; tucking sunglasses into the placket; tugging the knit hem down over the tee.
