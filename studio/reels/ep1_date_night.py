@@ -6,7 +6,8 @@
 
 <work>/voice: narration.wav, words.json (voice.py + timeline.py on reels/ep1_date_night.lines.txt)
 gpt assets: ep1_a_before, ep1_b_after, ep1_c_location, ep1_d_colour_black, ep1_e_colour_blue, ep1_f_hem (.png)
-gem assets: gem/before.png, gem/location.png, gem/vB_clean.mp4 (black → pale blue + navy wide trousers morph)
+gpt also uses gem/vB_clean.mp4 (Gemini morph made from the ChatGPT stills)
+gem assets: gem/face_*.png (from Gemini stills), gem/location.png, gem/vA_clean.mp4 (Gemini morph from the Gemini stills)
 """
 import argparse
 import json
@@ -28,9 +29,11 @@ from render import (  # noqa: E402
 ENDCARD, LEAD, FULL = 2.6, 0.25, 0.86
 BAD = (1, 0.42, 0.38)
 GOOD = (0.55, 0.95, 0.65)
-# Gemini morph clip (vB): black outfit held to 1.0 s, shirt changes 1.0–2.3 s, trousers 3.5–5.0 s, then holds.
-GEM_SHIRT = (1.0, 2.3)
-GEM_TROUSERS = (3.5, 5.0)
+# Morph clips, both made in Gemini (first + last frame):
+#   gpt: vB, from the ChatGPT stills — shirt changes 1.0–2.3 s, trousers 3.5–5.0 s, then holds
+#   gem: vA, from the Gemini stills (labels removed with lib/untext.py) — shirt 1.4–2.1 s, trousers 2.6–3.8 s,
+#        holds to 5.0 s, then the camera pushes in: sleeve roll 6.4–7.8 s, sunglasses on 8.2–9.6 s
+MORPH = {"gpt": ("vB_clean.mp4", (1.0, 2.3), (3.5, 5.0), 9.5), "gem": ("vA_clean.mp4", (1.4, 2.1), (2.6, 3.8), 4.9)}
 
 
 def swatch_col(ctx, items, x=150, y0=560, size=112, gap=78):
@@ -108,16 +111,15 @@ def build(work: Path, variant: str):
         A = lambda k, **kw: Img(work / f"ep1_{k}.png", **kw)  # noqa: E731
         before, after = A("a_before", fit=FULL), A("b_after", fit=FULL)
         loc, face_b, face_e, hem = A("c_location"), A("d_colour_black"), A("e_colour_blue"), A("f_hem")
-        clip = None
+        clip = Clip(work / "gem" / MORPH["gpt"][0], 0.0, 10.0, fit=FULL)
     else:
         G = work / "gem"
         for src, dst in (("before.png", "face_black.png"), ("after.png", "face_blue.png")):
             if not (G / dst).exists():
                 face_crop(G / src, G / dst)
-        clip = Clip(G / "vB_clean.mp4", 0.0, 10.0, fit=FULL)
-        before, after = clip.at(0.3), clip.at(8.0)
+        clip = Clip(G / MORPH["gem"][0], 0.0, 10.0, fit=FULL)
         before = Img(bgr=clip.frames[clip.index(0.3)].copy(), fit=FULL)
-        after = Img(bgr=clip.frames[clip.index(8.0)].copy(), fit=FULL)
+        after = Img(bgr=clip.frames[clip.index(4.5)].copy(), fit=FULL)
         loc = Img(G / "location.png")
         face_b, face_e = Img(G / "face_black.png"), Img(G / "face_blue.png")
         hem = None
@@ -135,7 +137,7 @@ def build(work: Path, variant: str):
     else:
         from render import cover
 
-        pb, pa = body_points(clip.frames[clip.index(0.3)]), body_points(clip.frames[clip.index(8.0)])
+        pb, pa = body_points(clip.frames[clip.index(0.3)]), body_points(clip.frames[clip.index(4.5)])
 
     def mp_(pt, z, im, cx=W / 2, cy=1000):
         return zoom_point(*im.map(*pt), z, cx, cy)
@@ -223,55 +225,24 @@ def build(work: Path, variant: str):
 
     add("s03_skinny", L[3], L[4], skinny)
 
-    # S4–S5 the fix. gpt: two-stage scan wipe (shirt on "pale", trousers on "navy"); gem: the Gemini morph,
-    # time-remapped so the shirt changes on "pale" and the trousers on "navy".
+    # S4–S5 the fix: the morph clip, time-remapped so the shirt changes on "pale" and the trousers on "navy".
     t_pale, t_navy = w("pale"), w("navy")
-    SHIRT_Y, LEG_Y = 1150, H + 60  # wipe stops just below the belt, then finishes the legs
+    _, SH, TR, HOLD_MAX = MORPH[variant]
 
     def fix_frame(ta):
-        if variant == "gem":
-            if ta < t_pale - 0.08:
-                c = GEM_SHIRT[0]
-            elif ta < t_navy - 0.1:
-                c = min(GEM_SHIRT[1], GEM_SHIRT[0] + (ta - (t_pale - 0.08)) * 1.7)
-            else:
-                c = min(10.0, GEM_TROUSERS[0] + (ta - (t_navy - 0.1)) * 1.3)
-                if c > GEM_TROUSERS[1]:
-                    c = GEM_TROUSERS[1] + (c - GEM_TROUSERS[1]) / 1.3
-            return clip.at(c)
-        return None
+        if ta < t_pale - 0.08:
+            c = SH[0]
+        elif ta < t_navy - 0.1:
+            c = min(SH[1], SH[0] + (ta - (t_pale - 0.08)) * 1.7)
+        else:
+            c = TR[0] + (ta - (t_navy - 0.1)) * 1.3
+            if c > TR[1]:
+                c = TR[1] + (c - TR[1]) / 1.3
+        return clip.at(min(c, HOLD_MAX))
 
     def fix(ctx, t, T, ta):
         z = 1.0 + 0.02 * (ta - L[4]) / (L[6] - L[4])
-        fr = fix_frame(ta)
-        if fr is not None:
-            paint(ctx, fr, z, *ZC)
-        else:
-            p1 = ease_in_out(prog(ta, t_pale - 0.15, 0.9))
-            p2 = ease_in_out(prog(ta, t_navy - 0.15, 0.8))
-            y = -60 + p1 * (SHIRT_Y + 60) + p2 * (LEG_Y - SHIRT_Y)
-            paint(ctx, before, z, *ZC)
-            if y > 0:
-                ctx.save()
-                ctx.rectangle(0, 0, W, y)
-                ctx.clip()
-                paint(ctx, after, z, *ZC)
-                ctx.restore()
-            moving = (0 < p1 < 1) or (0 < p2 < 1)
-            if moving:
-                band = 150
-                g = cairo.LinearGradient(0, y - band, 0, y)
-                g.add_color_stop_rgba(0, 1, 1, 1, 0)
-                g.add_color_stop_rgba(1, 1, 1, 1, 0.22)
-                ctx.set_source(g)
-                ctx.rectangle(0, y - band, W, band)
-                ctx.fill()
-            if moving or (p1 >= 1 and p2 <= 0):
-                ctx.set_source_rgba(1, 1, 1, 0.95 if moving else 0.5)
-                ctx.set_line_width(4)
-                ctx.move_to(0, y)
-                ctx.line_to(W, y)
-                ctx.stroke()
+        paint(ctx, fix_frame(ta), z, *ZC)
         if ta < t_navy:
             badge(ctx, "PALE BLUE SHIRT", True, ta - w("shirt"))
         else:
@@ -288,7 +259,7 @@ def build(work: Path, variant: str):
             k = ta - (t_wide - 0.05)
             paint(ctx, hem, 1.0 + 0.05 * k / max(0.1, L[6] - t_wide), W / 2, 1300)
             badge(ctx, "HEM ON THE SHOE", True, k - 0.2)
-        elif variant == "gem" and ta >= t_wide + 0.25:
+        elif variant == "gem" and ta >= t_wide + 0.25:  # gem has no hem close-up: push in on the clip's hem
             k = ta - (t_wide + 0.25)
             u = ease_in_out(clamp(k / 0.8))
             fr = fix_frame(ta)
@@ -304,8 +275,12 @@ def build(work: Path, variant: str):
 
     # S6 breakdown: the full look, swatches on the words, then the face comparison tiles
     def breakdown(ctx, t, T, ta):
-        im = clip.at(5.2 + t * 0.8) if clip else after
-        paint(ctx, im, 1.0 + 0.03 * t / T, *ZC)
+        if variant == "gem":  # the sleeve roll, framed on the upper body (late frames carry faint label traces lower down)
+            im = clip.at(min(7.9, 5.6 + t * 0.6))
+            paint(ctx, im, 1.36 + 0.03 * t / T, W / 2, 420)
+        else:
+            im = after
+            paint(ctx, im, 1.0 + 0.03 * t / T, *ZC)
         t_b1, t_b2 = w("belt"), w("loafers")
         swatch_col(ctx, [("Pale blue", "#c9d8ee", ta - (L[6] + 0.05)), ("Navy", "#1f2a44", ta - (L[6] + 0.2)), ("Brown", "#5b3a26", ta - t_b1)])
         badge(ctx, "BROWN LEATHER", True, ta - t_b2)
@@ -317,8 +292,14 @@ def build(work: Path, variant: str):
     add("s06_breakdown", L[6], L[7], breakdown)
 
     # S7 payoff on location
+    t_date = w("Date", after=L[7])
+
     def payoff(ctx, t, T, ta):
-        paint(ctx, loc, 1.0 + 0.06 * ease_in_out(t / T), W / 2, 950)
+        if variant == "gem" and ta >= t_date - 0.6:  # Gemini clip's own payoff: sunglasses on
+            k = ta - (t_date - 0.6)
+            paint(ctx, clip.at(min(9.9, 8.1 + k)), 1.5, W / 2, 250)
+        else:
+            paint(ctx, loc, 1.0 + 0.06 * ease_in_out(t / T), W / 2, 950)
         if ta < w("Date", after=L[7]) - 0.05:
             if ta < w("balanced"):
                 badge(ctx, "LONG LEG LINE", True, ta - w("Long"))
