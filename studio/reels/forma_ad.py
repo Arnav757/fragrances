@@ -350,6 +350,10 @@ class Ad:
         self.location = load(work.parent / "ep1" / "ep1_c_location.png", max_h=1920)
         self.hem = load(work.parent / "ep1" / "ep1_f_hem.png", max_h=1920)
         self.cafe = load(work.parent / "arjun" / "assets" / "img6_after_cafe.png")
+        O, C2 = work / "outfits", work / "cut2"
+        self.flat, self.plinth, self.swatch, self.hem2 = (load(O / f) for f in ("B1_paper_flatlay.png", "B2_sculptural_plinth.png", "B3_fabric_swatches.png", "B4_hem_macro.png"))
+        self.look = {k: load(C2 / f"{k}.png", max_h=1500, erode=3) for k in ("A1", "A2", "A3", "A4", "A5", "A6")}
+        self.plate = {k: load(O / f) for k, f in (("A2", "A2_office.png"), ("A4", "A4_wedding.png"))}
         self.T = Type()
         # section starts on the 145 BPM grid
         self.S = {"A": 0.0, "C": b(3), "D": b(6), "E": b(8), "F": b(10), "G": b(13), "H": b(16), "I": b(19),
@@ -569,6 +573,10 @@ class Ad:
     # F: YOUR COLOURS. — face on an ice disc, 3D swatch orbit, olive paint-over
     def sec_F(self, ctx, t):
         t0, end = self.S["F"], self.S["G"]
+        if t - t0 < 0.23:  # fabric-swatch flash, then the colour disc
+            cover(ctx, self.swatch, (0, 0, W, H), zoom=1.25 - 0.15 * e_out(prog(t, t0, 0.23)), fx=0.5, fy=0.5)
+            return
+        t0 += 0.23
         white(ctx)
         k = t - t0
         cx, cy, R = 540, 930, 330
@@ -633,7 +641,7 @@ class Ad:
     def sec_G(self, ctx, t):
         t0 = self.S["G"]
         white(ctx)
-        self.grid(ctx, t, t0, [self.paper, self.kinetic, self.glass], [(0.5, 0.45), (0.5, 0.45), (0.5, 0.5)], swap=None)
+        self.grid(ctx, t, t0, [self.flat, self.kinetic, self.glass], [(0.5, 0.5), (0.5, 0.45), (0.5, 0.5)], swap=None)
         # MANY LOOKS. starts tracking in at the end of G and lands in H
         self.many(ctx, t)
 
@@ -705,8 +713,8 @@ class Ad:
     def sec_H(self, ctx, t):
         t0 = self.S["H"]
         white(ctx)
-        sw = [(self.location, t0 + 0.05, (0.5, 0.42), None), (self.look1, t0 + 0.2, None, LIME), (self.cafe, t0 + 0.35, (0.5, 0.35), None)]
-        self.grid(ctx, t, self.S["G"], [self.paper, self.kinetic, self.glass], [(0.5, 0.45), (0.5, 0.45), (0.5, 0.5)], swap=sw)
+        sw = [(self.look["A1"], t0 + 0.05, None, ICE), (self.look["A3"], t0 + 0.2, None, LIME), (self.look["A5"], t0 + 0.35, None, ORANGE)]
+        self.grid(ctx, t, self.S["G"], [self.flat, self.kinetic, self.glass], [(0.5, 0.5), (0.5, 0.45), (0.5, 0.5)], swap=sw)
         # orbit marks around the grid centre
         o = e_out(prog(t, t0 + 0.1, 0.5)) * (1 - prog(t, self.S["I"] - 0.25, 0.25))
         if o > 0:
@@ -741,28 +749,54 @@ class Ad:
         hb = BEAT / 2
         seq = [
             ("full", self.glass, (0.5, 0.45), 1.35),
-            ("win", self.maker, (0.5, 0.35), 1.0),
-            ("full", self.hem, (0.5, 0.7), 1.15),
+            ("card", "A2", LIME, None),
+            ("full", self.hem2, (0.5, 0.6), 1.15),
             ("full", self.paper, (0.45, 0.4), 1.6),
-            ("win", self.location, (0.5, 0.45), 1.0),
+            ("card", "A4", COBALT, None),
             ("full", self.arch, (0.55, 0.45), 1.2),
             ("small3", None, None, None),
-            ("full", self.kinetic, (0.5, 0.45), 1.5),
+            ("full", self.plinth, (0.5, 0.42), 1.35),
         ]
         i = min(len(seq) - 1, int((t - t0) / hb))
         k = (t - t0) - i * hb
         kind, im, foc, z = seq[i]
+        if kind in ("card", "small3"):  # strokes pass behind the cards
+            self.marks(ctx, t, t0)
         if kind == "full":
             cover(ctx, im, (0, 0, W, H), zoom=z * (1 - 0.06 * e_out(prog(k, 0, hb))), fx=foc[0], fy=foc[1])
+        elif kind == "card":
+            u = e_out(prog(k, 0, 0.16))
+            w, h = lerp(560, 680, u), lerp(800, 980, u)
+            x, y = 540 - w / 2, 960 - h / 2
+            ctx.save()
+            rounded(ctx, x, y, w, h, 36)
+            ctx.clip()
+            ctx.set_source_rgb(*foc)
+            ctx.paint()
+            self.person(ctx, self.look[im], 540, y + h + 18, h * 0.97)
+            ctx.restore()
         elif kind == "win":
             u = e_out(prog(k, 0, 0.16))
             w, h = lerp(520, 640, u), lerp(700, 860, u)
             cover(ctx, im, (540 - w / 2, 960 - h / 2, w, h), zoom=1.1 - 0.1 * u, fx=foc[0], fy=foc[1], radius=30)
         else:  # three small windows at once
-            for j, (img, f) in enumerate(((self.glass, (0.5, 0.45)), (self.cafe, (0.5, 0.35)), (self.flower, (0.69, 0.31)))):
+            for j, (key, col) in enumerate((("A6", ICE), ("A1", LIME), ("A3", ORANGE))):
                 u = e_out(prog(k, j * 0.04, 0.16))
-                w, h = 300 * u, 420 * u
-                cover(ctx, img, (90 + j * 320 + (300 - w) / 2, 750 + (420 - h) / 2 + (j - 1) * 70, w, h), fx=f[0], fy=f[1], radius=24)
+                w, h = 300 * u, 460 * u
+                if w < 2:
+                    continue
+                x, y = 90 + j * 320 + (300 - w) / 2, 730 + (460 - h) / 2 + (j - 1) * 70
+                ctx.save()
+                rounded(ctx, x, y, w, h, 24)
+                ctx.clip()
+                ctx.set_source_rgb(*col)
+                ctx.paint()
+                self.person(ctx, self.look[key], x + w / 2, y + h + 10, h * 0.97)
+                ctx.restore()
+        if kind not in ("card", "small3"):
+            self.marks(ctx, t, t0)
+
+    def marks(self, ctx, t, t0):
         # paint marks (paint_reveal paths), drawn across the cuts
         segs = [
             ([((-90, 1120), (95, 930), (212, 1005), (322, 836)), ((322, 836), (432, 667), (495, 480), (668, 544)), ((668, 544), (841, 608), (860, 739), (1170, 360))], COBALT, 34, 0.0),
@@ -802,7 +836,7 @@ class Ad:
             ctx.set_source_rgb(*LIME)
             ctx.arc(540, 1240, 400, 0, 2 * math.pi)
             ctx.fill()
-            self.person(ctx, self.look1, 540, 1880, ph * 1.04)
+            self.person(ctx, self.look["A4"], 540, 1880, ph * 1.02)
             ctx.restore()
             for yy, live in ((y_top, sw < 1), (y_bot, 0 < sb < 1)):
                 if live:
