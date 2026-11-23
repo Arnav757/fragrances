@@ -9,7 +9,7 @@ import soundfile as sf
 
 SR = 48000
 BEAT = 60 / 145
-DUR = 15.0
+DUR = round((35 * 60 / 145 + 2.17) * 30) / 30
 rng = np.random.default_rng(7)
 
 
@@ -93,7 +93,7 @@ def main(out):
     place(L, pop(1200, 0.4), 0.0)
     place(L, hat(0.4, 0.02), 0.08)
     roots = [55.0, 43.65, 65.41, 49.0]  # A F C G
-    for n in range(3, 31):
+    for n in range(3, 35):
         t = b(n)
         place(L, kick(0.9 if n % 4 == 3 else 0.75), t)
         if n >= 6:
@@ -105,17 +105,26 @@ def main(out):
         place(L, bass(r, BEAT * 0.3, 0.18), t + BEAT / 2)
     # rapid ticks through the half-beat montage
     for k in range(8):
-        place(L, hat(0.32, 0.02), b(19) + k * BEAT / 2)
-        place(L, pop(1600 + 120 * k, 0.12), b(19) + k * BEAT / 2)
+        place(L, hat(0.32, 0.02), b(23) + k * BEAT / 2)
+        place(L, pop(1600 + 120 * k, 0.12), b(23) + k * BEAT / 2)
     # whooshes into the two zooms through the dot
     place(L, whoosh(0.3), b(3) - 0.3)
     place(L, whoosh(0.28), b(8) - 0.28)
     # dot pops: ? dot, logo dot
     place(L, pop(980, 0.35), b(6) + 0.2)
-    place(L, pop(700, 0.45), b(28) + 0.9)
+    place(L, pop(700, 0.45), b(32) + 0.9)
+    # colour test (section F, after the 0.23 s swatch flash): chip thuds, ✗ buzzes, ✓ chime + confetti
+    f0 = b(10) + 0.23
+    for tt in (0.32, 0.74):
+        place(L, kick(0.45), f0 + tt + 0.28)
+        place(L, tone([110.0, 116.5], 0.22, 0.22, 0.003, 0.08), f0 + tt + 0.28)
+    place(L, kick(0.5), f0 + 1.48)
+    place(L, tone([880.0, 1318.5, 1760.0], 0.7, 0.2, 0.003, 0.35), f0 + 1.47)
+    for j in range(3):
+        place(L, pop(1100 + 220 * j, 0.25), f0 + 1.8 + j * 0.09)
     # logo: kick + resolving chord, then let it ring out
-    place(L, kick(1.0), b(31))
-    place(L, tone([220.0, 277.18, 329.63, 440.0], DUR - b(31), 0.16, 0.01, 1.4), b(31))
+    place(L, kick(1.0), b(35))
+    place(L, tone([220.0, 277.18, 329.63, 440.0], DUR - b(35), 0.16, 0.01, 1.4), b(35))
     L = L[: int(DUR * SR)]
     fade = int(0.25 * SR)
     L[-fade:] *= np.linspace(1, 0, fade)

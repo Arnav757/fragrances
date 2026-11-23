@@ -29,7 +29,7 @@ OLIVE = (0x70 / 255, 0x82 / 255, 0x38 / 255)
 CAMEL = (0xC1 / 255, 0x9A / 255, 0x6B / 255)
 FONT = "Inter Tight Heavy"
 BEAT = 60 / 145
-TOTAL = 15.0
+TOTAL = round((35 * 60 / 145 + 2.17) * 30) / 30  # logo holds ~2.2 s
 
 
 def q(t):  # snap to a frame
@@ -89,8 +89,10 @@ def surf(bgra):
     return s
 
 
-def load(path, max_h=None, erode=0):
+def load(path, max_h=None, erode=0, pad_x=0):
     im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+    if pad_x:  # extend sideways by replicating edge columns (shoulders continue past the frame)
+        im = cv2.copyMakeBorder(im, 0, 0, pad_x, pad_x, cv2.BORDER_REPLICATE)
     if im.ndim == 2:
         im = cv2.cvtColor(im, cv2.COLOR_GRAY2BGRA)
     if im.shape[2] == 3:
@@ -344,8 +346,10 @@ class Ad:
         C = work / "cut"
         self.before = load(C / "before.png", max_h=1700, erode=3)
         self.after = load(C / "after.png", max_h=1700, erode=3)
-        self.faceA = load(C / "faceA.png", max_h=1300, erode=5)
-        self.faceB = load(C / "faceB.png", max_h=1300, erode=5)
+        self.faceA = load(C / "faceA.png", max_h=1300, erode=5, pad_x=400)
+        self.faceB = load(C / "faceB.png", max_h=1300, erode=5, pad_x=400)
+        self.faceA_k = 1672 / self.faceA.get_height()  # draw scale is given in source-pixel terms
+        self.faceB_k = 1672 / self.faceB.get_height()
         self.look1 = load(C / "look1.png", max_h=1500, erode=3)
         self.location = load(work.parent / "ep1" / "ep1_c_location.png", max_h=1920)
         self.hem = load(work.parent / "ep1" / "ep1_f_hem.png", max_h=1920)
@@ -356,8 +360,8 @@ class Ad:
         self.plate = {k: load(O / f) for k, f in (("A2", "A2_office.png"), ("A4", "A4_wedding.png"))}
         self.T = Type()
         # section starts on the 145 BPM grid
-        self.S = {"A": 0.0, "C": b(3), "D": b(6), "E": b(8), "F": b(10), "G": b(13), "H": b(16), "I": b(19),
-                  "J": b(23), "K": b(28), "L": b(31), "END": TOTAL}
+        self.S = {"A": 0.0, "C": b(3), "D": b(6), "E": b(8), "F": b(10), "G": b(17), "H": b(20), "I": b(23),
+                  "J": b(27), "K": b(32), "L": b(35), "END": TOTAL}
         # endcard mark geometry (forma_endcard_light.svg: translate(389 760) scale(.86))
         self.mk = (389, 760, 0.86)
         mx, my, ms = self.mk
@@ -570,72 +574,156 @@ class Ad:
                 ctx.rectangle(x - 18, 0, 18, H)
                 ctx.fill()
 
-    # F: YOUR COLOURS. — face on an ice disc, 3D swatch orbit, olive paint-over
+    # F: YOUR COLOURS. — a colour test: chips fly in, black ✗, grey ✗ (the disc shakes no), olive ✓
+    # (paint wipe to the olive look + confetti), then the rest of his palette pops in.
     def sec_F(self, ctx, t):
         t0, end = self.S["F"], self.S["G"]
-        if t - t0 < 0.23:  # fabric-swatch flash, then the colour disc
+        if t - t0 < 0.23:  # fabric-swatch flash, then the colour test
             cover(ctx, self.swatch, (0, 0, W, H), zoom=1.25 - 0.15 * e_out(prog(t, t0, 0.23)), fx=0.5, fy=0.5)
             return
         t0 += 0.23
         white(ctx)
         k = t - t0
-        cx, cy, R = 540, 930, 330
-        rin = back(prog(t, t0, 0.38), 1.4)
-        # orbit swatches (3D ring), back half first
-        sw = [ORANGE, COBALT, LIME, OLIVE, CAMEL, ICE]
-        ang0 = -1.2 + k * 2.4
-        tilt = math.radians(-14)
-        items = []
-        for i, col in enumerate(sw):
-            th = ang0 + i * 2 * math.pi / len(sw)
-            ex, ey = math.cos(th) * 470, math.sin(th) * 120
-            x = cx + ex * math.cos(tilt) - ey * math.sin(tilt)
-            y = cy + ex * math.sin(tilt) + ey * math.cos(tilt)
-            depth = math.sin(th)
-            items.append((depth, x, y, col))
-        grow = e_out(prog(t, t0 + 0.12, 0.4))
+        out = e_in(prog(t, end - 0.26, 0.26))  # everything shrinks into the centre at the end
+        cx, cy, R = 540, 830, 345
         ctx.save()
-        ctx.set_source_rgba(*INK, 0.85 * grow)
-        ctx.set_line_width(3)
-        ctx.translate(cx, cy)
-        ctx.rotate(tilt)
-        ctx.scale(1, 120 / 470)
-        ctx.arc(0, 0, 470 * grow, 0, 2 * math.pi)
-        ctx.restore()
-        ctx.stroke()
-        for depth, x, y, col in sorted(items):
-            if depth < 0:
-                dot(ctx, x, y, 44 * (1 + 0.3 * depth) * grow, col)
-        # disc + face
-        ctx.save()
-        ctx.arc(cx, cy, R * rin, 0, 2 * math.pi)
-        ctx.clip()
-        ctx.set_source_rgb(*ICE)
-        ctx.paint()
-        sc = 1.0
-        self.person(ctx, self.faceA, cx, cy + R + 140, 1180 * sc)
-        p = e_io(prog(t, t0 + 0.55, 0.38))
-        if p > 0:  # olive paint wipe rises from the bottom of the disc
-            yv = lerp(cy + R + 20, cy - R - 20, p)
+        if out > 0:
+            ctx.translate(cx, cy)
+            ctx.scale(1 - out, 1 - out)
+            ctx.translate(-cx, -cy)
+        # timings (s after the flash)
+        T_BLK, T_GRY, T_DROP, T_OLV, T_ROW = 0.32, 0.74, 1.12, 1.22, 1.62
+        # head shake on each ✗, bounce on ✓
+        shake = 0.0
+        for tt in (T_BLK + 0.28, T_GRY + 0.28):
+            u = prog(k, tt, 0.4)
+            if 0 < u < 1:
+                shake += 22 * math.sin(2 * math.pi * 3.5 * u) * (1 - u)
+        bounce = 1 + 0.07 * math.sin(math.pi * prog(k, T_OLV + 0.25, 0.3))
+        rin = back(prog(k, 0, 0.4), 1.6)
+        r = R * rin * bounce
+        dx = cx + shake
+        # confetti behind the disc
+        cu = prog(k, T_OLV + 0.25, 0.7)
+        if 0 < cu < 1:
+            for i in range(18):
+                ang = i * 2 * math.pi / 18 + 0.3
+                dist = R + 40 + 260 * e_out(cu) * (0.7 + 0.3 * ((i * 7) % 5) / 4)
+                col = (ORANGE, COBALT, LIME, OLIVE, ICE, CAMEL)[i % 6]
+                dot(ctx, dx + math.cos(ang) * dist, cy + math.sin(ang) * dist, (16 + 6 * (i % 3)) * (1 - cu))
+        # disc + face (head fully inside: the image is placed by the head, not the feet)
+        if r > 1:
             ctx.save()
-            ctx.rectangle(0, yv, W, H)
+            ctx.arc(dx, cy, r, 0, 2 * math.pi)
             ctx.clip()
             ctx.set_source_rgb(*ICE)
             ctx.paint()
-            self.person(ctx, self.faceB, cx, cy + R + 140, 1180 * sc)
+            sc = 0.5 * rin * bounce
+            top = cy - (R - 55) * rin * bounce
+            draw(ctx, self.faceA, dx, top, sc * self.faceA_k, 1.0, ax=0.5, ay=0.0)
+            p = e_io(prog(k, T_OLV + 0.1, 0.36))
+            if p > 0:
+                yv = lerp(cy + r + 20, cy - r - 20, p)
+                ctx.save()
+                ctx.rectangle(0, yv, W, H)
+                ctx.clip()
+                ctx.set_source_rgb(*ICE)
+                ctx.paint()
+                draw(ctx, self.faceB, dx, top, sc * self.faceB_k, 1.0, ax=0.5, ay=0.0)
+                ctx.restore()
+                if p < 1:
+                    ctx.set_source_rgb(*OLIVE)
+                    ctx.rectangle(0, yv - 16, W, 32)
+                    ctx.fill()
             ctx.restore()
-            if p < 1:
-                ctx.set_source_rgb(*OLIVE)
-                ctx.rectangle(0, yv - 14, W, 28)
-                ctx.fill()
+            # thin ink ring that draws on
+            ring = e_out(prog(k, 0.1, 0.5))
+            ctx.save()
+            ctx.set_source_rgb(*INK)
+            ctx.set_line_width(5)
+            ctx.arc(dx, cy, r + 18, -math.pi / 2, -math.pi / 2 + 2 * math.pi * ring)
+            ctx.stroke()
+            ctx.restore()
+        # chips
+        row_y = 1300
+        slots = [540 - 231, 540 - 77, 540 + 77, 540 + 231]
+        chips = [
+            # name, colour, ok, appear, from, land, size
+            ("BLACK", (0.04, 0.04, 0.04), False, T_BLK, (-200, 900), (250, row_y), 170),
+            ("ICY GREY", (0.85, 0.87, 0.89), False, T_GRY, (1280, 900), (830, row_y), 170),
+        ]
+        for name, col, ok, ta, src, dst, size in chips:
+            u = prog(k, ta, 0.3)
+            if u <= 0:
+                continue
+            fall = e_in(prog(k, T_DROP, 0.35))
+            x = lerp(src[0], dst[0], e_out(u))
+            y = lerp(src[1], dst[1], e_out(u)) - 260 * math.sin(math.pi * clamp(u)) + 1300 * fall
+            rot = lerp(-0.9 if src[0] < 0 else 0.9, -0.08 if src[0] < 0 else 0.08, back(u, 1.4)) + (2.0 if src[0] < 0 else -2.0) * fall
+            self.chip(ctx, x, y, size, col, name, rot, stamp=(ok, prog(k, ta + 0.26, 0.18)))
+        # olive lands centre with ✓, then slides into the palette row while the others pop in
+        u = prog(k, T_OLV, 0.32)
+        if u > 0:
+            m = e_io(prog(k, T_ROW, 0.3))
+            x = lerp(540, slots[0], m)
+            y = lerp(lerp(1900, row_y, e_out(u)), row_y, m)
+            size = lerp(190, 130, m)
+            self.chip(ctx, x, y, size, OLIVE, "OLIVE", lerp(0.3, 0, back(u, 1.4)), stamp=(True, prog(k, T_OLV + 0.25, 0.18)))
+        for j, (name, col) in enumerate((("CAMEL", CAMEL), ("RUST", (0.78, 0.39, 0.29)), ("TEAL", (0.18, 0.5, 0.48)))):
+            v = prog(k, T_ROW + 0.18 + j * 0.09, 0.3)
+            if v > 0:
+                self.chip(ctx, slots[j + 1], row_y, 130 * clamp(back(v, 2.2), 0, 1.3), col, name, 0.0, stamp=(True, prog(k, T_ROW + 0.4 + j * 0.09, 0.15)))
         ctx.restore()
-        for depth, x, y, col in sorted(items):
-            if depth >= 0:
-                dot(ctx, x, y, 44 * (1 + 0.3 * depth) * grow, col)
         T = self.T
-        out = end - 0.2
-        T.word(ctx, "YOUR", W / 2, 440, 200, t, t0 + 0.06, t_out=out, stagger=0.03, dur=0.36)
-        T.word(ctx, "COLOURS.", W / 2, 1600, 168, t, t0 + 0.14, t_out=out, stagger=0.026, dur=0.36)
+        tw = end - 0.24
+        T.word(ctx, "YOUR", W / 2, 300, 170, t, t0, t_out=tw, stagger=0.03, dur=0.34)
+        T.word(ctx, "COLOURS.", W / 2, 1560, 150, t, t0 + T_OLV + 0.2, t_out=tw, stagger=0.026, dur=0.34)
+
+    def chip(self, ctx, x, y, size, col, name, rot, stamp=None):
+        """A rounded colour chip with its name under it and an optional ✓/✗ stamp at the corner."""
+        if size < 2:
+            return
+        ctx.save()
+        ctx.translate(x, y)
+        ctx.rotate(rot)
+        h = size * 1.18
+        rounded(ctx, -size / 2 + 6, -h / 2 + 10, size, h, 22)  # shadow
+        ctx.set_source_rgba(0, 0, 0, 0.12)
+        ctx.fill()
+        rounded(ctx, -size / 2, -h / 2, size, h, 22)
+        ctx.set_source_rgb(1, 1, 1)
+        ctx.fill()
+        rounded(ctx, -size / 2 + 10, -h / 2 + 10, size - 20, size - 20, 14)
+        ctx.set_source_rgb(*col)
+        ctx.fill()
+        ctx.select_font_face(FONT)
+        fs = max(10, size * 0.13)
+        ctx.set_font_size(fs)
+        ex = ctx.text_extents(name)
+        ctx.set_source_rgb(*INK)
+        ctx.move_to(-ex.x_advance / 2, h / 2 - fs * 0.55)
+        ctx.show_text(name)
+        if stamp and stamp[1] > 0:
+            ok, p = stamp
+            s = back(p, 2.5)
+            rr = size * 0.2 * s
+            sx, sy = size / 2 - 4, -h / 2 + 4
+            dot(ctx, sx, sy, rr, (0.16, 0.72, 0.36) if ok else (0.92, 0.2, 0.2))
+            ctx.set_source_rgb(1, 1, 1)
+            ctx.set_line_width(rr * 0.26)
+            ctx.set_line_cap(cairo.LINE_CAP_ROUND)
+            if ok:
+                ctx.move_to(sx - rr * 0.45, sy)
+                ctx.line_to(sx - rr * 0.1, sy + rr * 0.38)
+                ctx.line_to(sx + rr * 0.5, sy - rr * 0.35)
+            else:
+                kk = rr * 0.36
+                ctx.move_to(sx - kk, sy - kk)
+                ctx.line_to(sx + kk, sy + kk)
+                ctx.move_to(sx + kk, sy - kk)
+                ctx.line_to(sx - kk, sy + kk)
+            ctx.stroke()
+        ctx.restore()
 
     # G: three windows at different scales lock into a grid
     def sec_G(self, ctx, t):
