@@ -87,7 +87,7 @@ export function CheckoutPanel({ token, plans, mode, firstName }: { token: string
         description: `Style report ${d.orderNumber}`,
         order_id: d.gatewayOrderId,
         prefill: d.prefill,
-        theme: { color: "#121212" },
+        theme: { color: "#17191d" },
         modal: { ondismiss: () => toast("Payment window closed — you can try again any time.") },
         handler: async (resp: RazorpaySuccess) => {
           setVerifying(true);

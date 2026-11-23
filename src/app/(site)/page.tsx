@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Check, Clock, Eye, Palette, Ruler, Shirt, ShoppingBag, Sparkles, Trash2, UserCheck, X } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
@@ -11,6 +12,25 @@ import { getSettings, storeName } from "@/lib/settings";
 import { formatINR } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
+
+const LOOKS: { key: string; name: string; note: string; bg: string; ink?: boolean }[] = [
+  { key: "A1", name: "Weekend", note: "Navy linen, light straight denim", bg: "#a5e8ff" },
+  { key: "A2", name: "Office", note: "Camel knit, pleated taupe", bg: "#c7ff43" },
+  { key: "A3", name: "Summer", note: "Slub henley, flared denim", bg: "#ff4f2a" },
+  { key: "A4", name: "Wedding", note: "Ivory bandhgala, black flares", bg: "#2557ff" },
+  { key: "A5", name: "Knit", note: "Grey crewneck, ecru wide jeans", bg: "#ffe4dc" },
+  { key: "A6", name: "Tonal", note: "Navy on navy, pleats", bg: "#a5e8ff" },
+];
+
+const PLATES: [string, string][] = [
+  ["paper-flatlay", "A date-night outfit laid out on white with cut-paper shapes"],
+  ["hem-macro", "A navy pinstripe trouser hem resting on a brown loafer"],
+  ["sculptural-plinth", "A tailor's form in a pale blue shirt and wide navy trousers under a cobalt arch"],
+  ["fabric-swatches", "A fan of fabric swatches in olive, camel, navy and ivory"],
+  ["paper-studio", "Cut-paper shapes in cobalt, orange and lime"],
+  ["idea-architecture", "A cobalt and orange architectural sculpture with a staircase"],
+  ["glass-flower", "Stacked lime and ice-blue glass rings with a cobalt ribbon"],
+];
 
 const FAQ: [string, string][] = [
   ["Do I need to book a call?", "No. You answer a short quiz and (optionally) add two photos. Everything else happens on our side."],
@@ -62,6 +82,68 @@ export default async function Home() {
             </ul>
           </div>
 
+          <div className="relative mx-auto w-full max-w-[330px]">
+            <span className="absolute -left-6 top-10 h-16 w-16 rounded-full bg-gold" aria-hidden />
+            <span className="absolute -right-5 bottom-16 h-24 w-24 rounded-full border-[6px] border-cobalt" aria-hidden />
+            <div className="relative aspect-[9/16] overflow-hidden rounded-[2.25rem] border-[6px] border-ink bg-white shadow-2xl">
+              <video
+                src="/brand/forma-ad.mp4"
+                poster="/brand/forma-ad-poster.webp"
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                className="h-full w-full object-cover"
+                aria-label={`${name} brand film: one frame, many looks`}
+              />
+            </div>
+          </div>
+        </Container>
+      </section>
+
+      {/* ------------------------------------------------------------ looks */}
+      <section>
+        <Container className="py-16 lg:py-20">
+          <div className="flex flex-wrap items-end justify-between gap-6">
+            <h2 className="max-w-xl text-4xl leading-[1.02] sm:text-6xl">
+              One frame.
+              <br />
+              Many looks<span className="text-gold">.</span>
+            </h2>
+            <p className="max-w-sm leading-relaxed text-charcoal">Same guy, six occasions. Every look follows one rule for his broad shoulders and warm skin: a long leg line, in colours that suit him.</p>
+          </div>
+          <ul className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            {LOOKS.map((l) => (
+              <li key={l.key} className="group">
+                <div className="relative aspect-[3/5] overflow-hidden rounded-3xl transition-transform duration-500 ease-out-soft group-hover:-translate-y-1" style={{ backgroundColor: l.bg }}>
+                  <Image
+                    src={`/brand/looks/${l.key}.webp`}
+                    alt={`${l.name} look: ${l.note}`}
+                    fill
+                    sizes="(min-width: 1024px) 16vw, (min-width: 640px) 30vw, 45vw"
+                    className="object-contain object-bottom pt-4 transition-transform duration-500 ease-out-soft group-hover:scale-[1.03]"
+                  />
+                </div>
+                <p className="mt-3 font-display text-lg font-bold">{l.name}</p>
+                <p className="text-sm text-stone">{l.note}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-6 text-xs text-mist">Models and outfits shown are AI-generated.</p>
+        </Container>
+      </section>
+
+      {/* ------------------------------------------------------------ preview */}
+      <section className="border-y border-line bg-paper">
+        <Container className="grid items-center gap-12 py-16 lg:grid-cols-[1fr_1.1fr] lg:py-20">
+          <div>
+            <h2 className="text-4xl leading-[1.02] sm:text-5xl">Your colours, tested in minutes.</h2>
+            <p className="mt-5 max-w-md leading-relaxed text-charcoal">Black and icy grey wash out warm skin. Olive, camel and rust make it glow. Your free preview shows your frame, your colour family and your first outfits before you pay anything.</p>
+            <div className="relative mt-8 hidden aspect-[2/3] w-56 overflow-hidden rounded-3xl lg:block">
+              <Image src="/brand/plates/fabric-swatches.webp" alt="A fan of fabric swatches in olive, camel, navy and ivory" fill sizes="224px" className="object-cover" />
+            </div>
+          </div>
           <div className="relative">
             <div className="rounded-[2rem] bg-night p-6 text-paper shadow-2xl sm:p-8">
               <div className="flex items-center justify-between">
@@ -137,6 +219,20 @@ export default async function Home() {
             ))}
           </ol>
         </Container>
+      </section>
+
+      {/* ------------------------------------------------------------ details strip */}
+      <section aria-label="Details" className="pb-16 lg:pb-24">
+        <Container>
+          <h2 className="text-3xl leading-[1.05] sm:text-4xl">Made to measure, down to the hem<span className="text-gold">.</span></h2>
+        </Container>
+        <div className="mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:px-8 [scrollbar-width:none]">
+          {PLATES.map(([f, alt]) => (
+            <div key={f} className="relative aspect-[2/3] w-56 shrink-0 snap-start overflow-hidden rounded-3xl sm:w-64">
+              <Image src={`/brand/plates/${f}.webp`} alt={alt} fill sizes="256px" className="object-cover" />
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* ------------------------------------------------------------ what you get */}
@@ -278,9 +374,11 @@ export default async function Home() {
 
       <section className="pb-8">
         <Container>
-          <div className="rounded-[2rem] bg-gold px-6 py-14 text-center text-paper sm:px-12">
-            <h2 className="mx-auto max-w-2xl text-4xl leading-[1.02] sm:text-5xl">Know exactly what to wear. Starting today.</h2>
-            <ButtonLink href="/start" size="lg" className="mt-8 bg-paper !text-ink hover:bg-ivory">
+          <div className="relative overflow-hidden rounded-[2rem] bg-gold px-6 py-14 text-center text-ink sm:px-12">
+            <span className="absolute -right-10 -top-10 h-40 w-40 rounded-full border-[10px] border-cobalt" aria-hidden />
+            <span className="absolute -bottom-8 left-8 h-20 w-20 rounded-full bg-lime" aria-hidden />
+            <h2 className="relative mx-auto max-w-2xl text-4xl leading-[1.02] sm:text-5xl">Know exactly what to wear. Starting today.</h2>
+            <ButtonLink href="/start" size="lg" className="relative mt-8 bg-ink !text-white hover:bg-charcoal">
               Start my free analysis <ArrowRight className="h-4 w-4" aria-hidden />
             </ButtonLink>
           </div>

@@ -1,20 +1,24 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ivory: #f3f1ec;
-  --color-paper: #fbfaf7;
-  --color-sand: #e9e5dc;
-  --color-line: #dcd6ca;
-  --color-ink: #121212;
-  --color-charcoal: #262626;
-  --color-stone: #64605a;
-  --color-mist: #99948b;
+  /* Light mode: pure white canvas, ink type, signal orange accent (matches the F. mark). */
+  --color-ivory: #ffffff;
+  --color-paper: #f5f6f8;
+  --color-sand: #e9ebef;
+  --color-line: #e1e4ea;
+  --color-ink: #17191d;
+  --color-charcoal: #2b2e34;
+  --color-stone: #5f636b;
+  --color-mist: #9ca0a8;
   /* Accent (kept under the `gold` names so shared components stay stable). */
-  --color-gold: #b0502a;
-  --color-gold-deep: #7d3519;
-  --color-gold-soft: #f2dfd2;
-  --color-night: #111111;
-  --color-night-2: #1b1b1b;
+  --color-gold: #ff4f2a;
+  --color-gold-deep: #c4361a;
+  --color-gold-soft: #ffe4dc;
+  --color-cobalt: #2557ff;
+  --color-lime: #c7ff43;
+  --color-ice: #a5e8ff;
+  --color-night: #17191d;
+  --color-night-2: #22252b;
   --color-success: #2f6b46;
   --color-danger: #a3322a;
   --color-warning: #8a6420;
