@@ -34,9 +34,13 @@ export default async function Overview() {
       where status in ('paid', 'revision_requested') order by due_at nulls last limit 8`,
     getSettings("pricing"),
   ]);
+  const [[upi], payments] = await Promise.all([
+    sql<{ n: number }[]>`select count(*)::int as n from payments where provider = 'upi' and status = 'pending'`,
+    getSettings("payments"),
+  ]);
   const s = integrationStatus();
   const warnings = [
-    !s.razorpay.configured && "Razorpay keys are not set — customers can't pay.",
+    !s.razorpay.configured && !payments.upiEnabled && "Razorpay keys are not set and UPI QR is off — customers can't pay.",
     s.razorpay.configured && !s.razorpay.webhook && "RAZORPAY_WEBHOOK_SECRET is not set — payments rely on the browser callback only.",
     !s.email.configured && "Email isn't configured — customers won't receive their report links.",
     !s.ai.configured && "ANTHROPIC_API_KEY isn't set — analyses use quiz answers only, photos are not analysed.",
@@ -47,6 +51,11 @@ export default async function Overview() {
   return (
     <>
       <PageHeader title="Overview" description="Review queue, funnel and setup status." />
+      {upi!.n > 0 && (
+        <Notice tone="warning" title={`${upi!.n} UPI payment${upi!.n > 1 ? "s" : ""} waiting for you`} className="mb-6">
+          Customers are waiting for their reports. <Link href="/admin/orders" className="underline">Check and confirm them under Orders</Link>.
+        </Notice>
+      )}
       {warnings.length > 0 && (
         <Notice tone="warning" title="Before going live" className="mb-8">
           <ul className="mt-1 list-disc pl-5">

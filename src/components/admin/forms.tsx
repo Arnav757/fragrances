@@ -3,8 +3,8 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { createDiscountAction, refundAction, saveSettingsAction, toggleDiscountAction } from "@/app/actions/admin";
-import type { PricingSettings, PrivacySettings, ShopSettings, StoreSettings } from "@/lib/settings";
+import { confirmUpiAction, createDiscountAction, refundAction, rejectUpiAction, saveSettingsAction, toggleDiscountAction } from "@/app/actions/admin";
+import type { PaymentsSettings, PricingSettings, PrivacySettings, ShopSettings, StoreSettings } from "@/lib/settings";
 import type { ActionResult } from "@/lib/forms";
 import { paiseToRupeesString, rupeesToPaise } from "@/lib/money";
 import { Button } from "../ui/button";
@@ -114,6 +114,56 @@ export function ShopForm({ v }: { v: ShopSettings }) {
   );
 }
 
+export function PaymentsForm({ v }: { v: PaymentsSettings }) {
+  const { pending, run } = useSave();
+  return (
+    <form
+      action={(f) => run(() => saveSettingsAction("payments", { upiEnabled: f.get("upiEnabled") === "on", upiId: str(f, "upiId").trim(), upiName: str(f, "upiName") }))}
+      className="space-y-4"
+    >
+      <Checkbox id="upiEnabled" name="upiEnabled" defaultChecked={v.upiEnabled} label="Take payments by UPI QR (replaces Razorpay at checkout while on)" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="UPI ID" htmlFor="upiId" hint="e.g. yourname@bank — payments go here">
+          <Input id="upiId" name="upiId" defaultValue={v.upiId} autoComplete="off" />
+        </Field>
+        <Field label="Payee name shown in the UPI app" htmlFor="upiName" hint="Leave blank to use the business name">
+          <Input id="upiName" name="upiName" defaultValue={v.upiName} />
+        </Field>
+      </div>
+      <p className="text-xs text-stone">Customers scan a QR with the exact amount and order number, then submit their UPI transaction ID. Check each payment in your bank app, then confirm it under Orders — the report unlocks only after you confirm.</p>
+      <Button type="submit" loading={pending}>Save</Button>
+    </form>
+  );
+}
+
+export function UpiReviewButtons({ paymentId }: { paymentId: string }) {
+  const { pending, run } = useSave();
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Button
+        size="sm"
+        loading={pending}
+        onClick={() => {
+          if (confirm("Have you checked this payment arrived in your bank / UPI app with the right amount?")) run(() => confirmUpiAction(paymentId));
+        }}
+      >
+        Confirm received
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={pending}
+        onClick={() => {
+          const reason = prompt("Not received? Reason (shown internally):", "Not found in bank statement");
+          if (reason !== null) run(() => rejectUpiAction(paymentId, reason));
+        }}
+      >
+        Not received
+      </Button>
+    </div>
+  );
+}
+
 export function PrivacyForm({ v }: { v: PrivacySettings }) {
   const { pending, run } = useSave();
   return (
@@ -176,7 +226,7 @@ export function RefundButton({ orderId }: { orderId: string }) {
       variant="ghost"
       loading={pending}
       onClick={() => {
-        const reason = prompt("Refund the full amount? Reason (internal):");
+        const reason = prompt("Refund the full amount? For UPI orders, send the money back from your UPI app first — this only records it. Reason (internal):");
         if (reason !== null) run(() => refundAction(orderId, reason));
       }}
     >

@@ -9,6 +9,7 @@ import { getSettings } from "@/lib/settings";
 import { getGateway } from "@/lib/payments/gateway";
 import { formatDate } from "@/lib/utils";
 import { db } from "@/lib/db";
+import { pendingUpiFor, upiReady } from "@/lib/services/upi";
 
 export const metadata: Metadata = { title: "Your style report", robots: { index: false, follow: false }, referrer: "no-referrer" };
 export const dynamic = "force-dynamic";
@@ -21,8 +22,9 @@ export default async function ReportPage({ params }: { params: Promise<{ token: 
   const observations = effectiveObservations(a);
 
   if (view.kind === "preview") {
-    const pricing = await getSettings("pricing");
+    const [pricing, payments, pending] = await Promise.all([getSettings("pricing"), getSettings("payments"), pendingUpiFor(a.id)]);
     const gateway = getGateway();
+    const mode = upiReady(payments) ? "upi" : gateway ? gateway.provider : "off";
     const plans = [
       { code: "standard" as const, label: "Standard review", pricePaise: pricing.standardPaise, hours: pricing.standardHours },
       ...(pricing.priorityEnabled ? [{ code: "priority" as const, label: "Priority review", pricePaise: pricing.priorityPaise, hours: pricing.priorityHours }] : []),
@@ -36,7 +38,8 @@ export default async function ReportPage({ params }: { params: Promise<{ token: 
         source={a.observationSource}
         aiNote={a.aiNotes}
         plans={plans}
-        mode={gateway ? gateway.provider : "off"}
+        mode={mode}
+        pendingUpi={pending ? { orderNumber: pending.orderNumber, utr: pending.utr, amountPaise: pending.amountPaise } : null}
       />
     );
   }

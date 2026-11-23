@@ -328,6 +328,7 @@ export async function runRetention(now = new Date()) {
   const expired = await db()`
     update orders set status = 'expired'
     where status in ('awaiting_payment', 'payment_failed') and created_at < ${now}::timestamptz - make_interval(hours => ${pricing.orderExpiryHours})
+      and not exists (select 1 from payments p where p.order_id = orders.id and p.provider = 'upi' and p.status = 'pending')
     returning id`;
   return { photosDeleted: photos, previewsDeleted: previews, ordersExpired: expired.length };
 }

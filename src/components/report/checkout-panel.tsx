@@ -4,8 +4,9 @@ import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Lock, ShieldCheck } from "lucide-react";
-import { quoteAction, simulatePaymentAction, startCheckoutAction, verifyPaymentAction, type StartPayment } from "@/app/actions/analysis";
+import { Clock, Copy, Lock, ShieldCheck, Smartphone } from "lucide-react";
+import { quoteAction, simulatePaymentAction, startCheckoutAction, startUpiCheckoutAction, submitUtrAction, verifyPaymentAction, type StartPayment } from "@/app/actions/analysis";
+import type { UpiCheckout } from "@/lib/services/upi";
 import { formatINR } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
@@ -20,9 +21,11 @@ declare global {
   }
 }
 
+export type PendingUpiView = { orderNumber: string; utr: string; amountPaise: number };
+
 export type PlanOption = { code: "standard" | "priority"; label: string; pricePaise: number; hours: number };
 
-export function CheckoutPanel({ token, plans, mode, firstName }: { token: string; plans: PlanOption[]; mode: "razorpay" | "mock" | "off"; firstName: string }) {
+export function CheckoutPanel({ token, plans, mode, firstName, pendingUpi }: { token: string; plans: PlanOption[]; mode: "razorpay" | "mock" | "upi" | "off"; firstName: string; pendingUpi: PendingUpiView | null }) {
   const router = useRouter();
   const [plan, setPlan] = useState<PlanOption["code"]>(plans[0]!.code);
   const [code, setCode] = useState("");
@@ -33,6 +36,8 @@ export function CheckoutPanel({ token, plans, mode, firstName }: { token: string
   const [verifying, setVerifying] = useState(false);
   const [mockOrder, setMockOrder] = useState<StartPayment | null>(null);
   const [scriptReady, setScriptReady] = useState(false);
+  const [upi, setUpi] = useState<UpiCheckout | null>(null);
+  const [utr, setUtr] = useState("");
 
   const current = plans.find((p) => p.code === plan)!;
   const total = applied && applied.plan === plan ? applied.totalPaise : current.pricePaise;
@@ -63,6 +68,18 @@ export function CheckoutPanel({ token, plans, mode, firstName }: { token: string
       marketingConsent: form.get("marketing") === "on",
       acceptTerms: form.get("terms") === "on",
     };
+    if (mode === "upi") {
+      start(async () => {
+        const r = await startUpiCheckoutAction(token, input);
+        if (!r.ok || !r.data) {
+          if (!r.ok && r.errors) setErrors(r.errors);
+          setError(r.ok ? "Could not start payment." : r.message);
+          return;
+        }
+        setUpi(r.data);
+      });
+      return;
+    }
     start(async () => {
       const r = await startCheckoutAction(token, input);
       if (!r.ok || !r.data) {
@@ -104,6 +121,16 @@ export function CheckoutPanel({ token, plans, mode, firstName }: { token: string
     });
   }
 
+  function sendUtr() {
+    if (!upi) return;
+    setError(null);
+    start(async () => {
+      const r = await submitUtrAction(token, upi.orderId, utr);
+      if (r.ok) router.refresh();
+      else setError(r.message);
+    });
+  }
+
   function simulate(outcome: "success" | "failure") {
     if (!mockOrder) return;
     start(async () => {
@@ -124,6 +151,21 @@ export function CheckoutPanel({ token, plans, mode, firstName }: { token: string
     );
   }
 
+  if (pendingUpi) {
+    return (
+      <div id="unlock" role="status" className="scroll-mt-24 rounded-2xl border border-ink/15 bg-paper p-6">
+        <p className="inline-flex items-center gap-2 rounded-full bg-gold-soft px-3 py-1 text-xs font-medium text-gold-deep">
+          <Clock className="h-3.5 w-3.5" aria-hidden /> Payment being verified
+        </p>
+        <h2 className="mt-3 text-2xl leading-tight">Thanks, {firstName}. We&apos;re checking your payment.</h2>
+        <p className="mt-2 text-sm leading-relaxed text-charcoal">
+          We received transaction ID <span className="font-mono font-medium">{pendingUpi.utr}</span> for {formatINR(pendingUpi.amountPaise)} (order {pendingUpi.orderNumber}). As soon as we see it in our account, your full report unlocks here and we email you the link — usually within a few hours.
+        </p>
+        <p className="mt-3 text-xs text-stone">Don&apos;t pay again. If you entered the wrong number, contact us with your order number.</p>
+      </div>
+    );
+  }
+
   return (
     <div id="unlock" className="scroll-mt-24 rounded-2xl border border-ink/15 bg-paper p-5 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.35)] sm:p-6">
       {mode === "razorpay" && <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" onReady={() => setScriptReady(true)} />}
@@ -131,6 +173,7 @@ export function CheckoutPanel({ token, plans, mode, firstName }: { token: string
       <h2 className="mt-2 text-2xl leading-tight">Your full report, {firstName}</h2>
       <p className="mt-1 text-sm text-stone">Opens instantly. Then a stylist reviews it and adds a personal note.</p>
 
+      {!upi && (
       <fieldset className="mt-5 space-y-2">
         <legend className="sr-only">Review speed</legend>
         {plans.map((p) => (
@@ -146,8 +189,42 @@ export function CheckoutPanel({ token, plans, mode, firstName }: { token: string
           </label>
         ))}
       </fieldset>
+      )}
 
-      {mockOrder ? (
+      {upi ? (
+        <div className="mt-5">
+          <p className="text-sm font-medium">Scan to pay {formatINR(upi.amountPaise)}</p>
+          <p className="mt-0.5 text-xs text-stone">Any UPI app: GPay, PhonePe, Paytm, BHIM. The amount and order number are filled in for you.</p>
+          <div className="mx-auto mt-4 w-56 rounded-2xl border border-line bg-white p-3" aria-label={`UPI QR code to pay ${formatINR(upi.amountPaise)} to ${upi.payee}`} role="img" dangerouslySetInnerHTML={{ __html: upi.qrSvg }} />
+          <a href={upi.uri} className="mt-3 flex h-11 items-center justify-center gap-2 rounded-full bg-ink text-sm font-medium text-white lg:hidden">
+            <Smartphone className="h-4 w-4" aria-hidden /> Pay with a UPI app
+          </a>
+          <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-line bg-white px-3 py-2 text-sm">
+            <span className="min-w-0 truncate">
+              <span className="text-stone">UPI ID </span>
+              <span className="font-mono">{upi.upiId}</span>
+            </span>
+            <button
+              type="button"
+              className="inline-flex shrink-0 items-center gap-1 text-xs font-medium underline-offset-2 hover:underline"
+              onClick={() => navigator.clipboard.writeText(upi.upiId).then(() => toast.success("UPI ID copied"))}
+            >
+              <Copy className="h-3.5 w-3.5" aria-hidden /> Copy
+            </button>
+          </div>
+          <p className="mt-1.5 text-xs text-stone">Paying to {upi.payee} · order {upi.orderNumber}. Pay exactly {formatINR(upi.amountPaise)}.</p>
+          <div className="mt-5 border-t border-line pt-4">
+            {error && <Notice tone="danger" className="mb-3">{error}</Notice>}
+            <Field label="After paying: your UPI transaction ID" htmlFor="utr" hint="12 digits, shown as UTR / UPI Ref No. in your app's payment details">
+              <Input id="utr" inputMode="numeric" autoComplete="off" placeholder="123456789012" value={utr} onChange={(e) => setUtr(e.target.value.replace(/[^\d ]/g, "").slice(0, 16))} />
+            </Field>
+            <Button className="mt-3 w-full" size="lg" onClick={sendUtr} loading={pending} disabled={utr.replace(/\s/g, "").length !== 12} data-testid="submit-utr">
+              I&apos;ve paid — submit
+            </Button>
+            <p className="mt-2 text-center text-xs text-stone">We check every payment by hand, usually within a few hours. Your report unlocks as soon as it&apos;s confirmed.</p>
+          </div>
+        </div>
+      ) : mockOrder ? (
         <div className="mt-5 rounded-xl border border-dashed border-warning/60 bg-warning/5 p-4">
           <p className="text-sm font-medium">Test mode — simulated payment of {formatINR(mockOrder.amountPaise)}</p>
           <p className="mt-1 text-xs text-stone">Razorpay isn&apos;t configured here. No money moves; the server still verifies a signed payment.</p>
@@ -201,7 +278,7 @@ export function CheckoutPanel({ token, plans, mode, firstName }: { token: string
           </Button>
           {mode === "off" && <p className="text-center text-xs text-danger">Payments aren&apos;t available right now.</p>}
           <p className="flex items-center justify-center gap-1.5 text-center text-xs text-stone">
-            <ShieldCheck className="h-3.5 w-3.5" aria-hidden /> UPI, cards & netbanking via Razorpay · GST included · Revisions included
+            <ShieldCheck className="h-3.5 w-3.5" aria-hidden /> {mode === "upi" ? "Pay by UPI QR" : "UPI, cards & netbanking via Razorpay"} · GST included · Revisions included
           </p>
         </form>
       )}

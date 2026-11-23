@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireAdmin, requireStaff } from "@/lib/auth/session";
 import { AnalysisError, applyStylistOverrides, deletePhotosNow, releaseReport, removeOutfit, saveStylistNote, updateOutfit } from "@/lib/services/analyses";
 import { PaymentError, refundOrder } from "@/lib/services/payments";
+import { confirmUpi, rejectUpi } from "@/lib/services/upi";
 import { saveSettings, type SettingsKey } from "@/lib/settings";
 import { audit } from "@/lib/services/audit";
 import { discountSchema } from "@/lib/validation";
@@ -93,10 +94,33 @@ export async function refundAction(orderId: string, reason: string): Promise<Act
   }
 }
 
+export async function confirmUpiAction(paymentId: string): Promise<ActionResult> {
+  try {
+    const u = await requireAdmin();
+    const r = await confirmUpi(id.parse(paymentId), u.id);
+    revalidatePath("/admin/orders");
+    revalidatePath("/admin");
+    return { ok: true, message: r.result === "duplicate_payment" ? "Recorded — but this report was already unlocked. Refund this payment." : "Payment confirmed. Report unlocked and the customer emailed." };
+  } catch (e) {
+    return toActionError(e, [PaymentError]);
+  }
+}
+
+export async function rejectUpiAction(paymentId: string, reason: string): Promise<ActionResult> {
+  try {
+    const u = await requireAdmin();
+    await rejectUpi(id.parse(paymentId), u.id, z.string().max(300).parse(reason ?? ""));
+    revalidatePath("/admin/orders");
+    return { ok: true, message: "Marked as not received. The customer can pay again." };
+  } catch (e) {
+    return toActionError(e, [PaymentError]);
+  }
+}
+
 export async function saveSettingsAction(key: SettingsKey | "pages", value: unknown): Promise<ActionResult> {
   try {
     const u = await requireAdmin();
-    await saveSettings(z.enum(["store", "pricing", "shop", "privacy", "pages"]).parse(key), value, u.id);
+    await saveSettings(z.enum(["store", "pricing", "shop", "privacy", "payments", "pages"]).parse(key), value, u.id);
     await audit(u.id, "settings.update", "settings", key);
     revalidatePath("/", "layout");
     return { ok: true, message: "Saved." };

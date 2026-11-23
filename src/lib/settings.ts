@@ -41,22 +41,36 @@ export const privacySettingsSchema = z.object({
   unpaidRetentionDays: z.number().int().min(1).max(365).default(14),
 });
 
+// Manual UPI (temporary): customers pay a QR and submit the UTR; an admin confirms each payment.
+export const paymentsSettingsSchema = z.object({
+  upiEnabled: z.boolean().default(false),
+  upiId: z
+    .string()
+    .trim()
+    .max(80)
+    .regex(/^$|^[a-zA-Z0-9._-]{2,256}@[a-zA-Z][a-zA-Z0-9.-]{1,64}$/, { error: "Enter a UPI ID like name@bank" })
+    .default(""),
+  upiName: optionalText(60),
+});
+
 export const pagesSettingsSchema = z.record(z.enum(PAGE_KEYS), z.string().max(30000));
 
 export type StoreSettings = z.infer<typeof storeSettingsSchema>;
 export type PricingSettings = z.infer<typeof pricingSettingsSchema>;
 export type ShopSettings = z.infer<typeof shopSettingsSchema>;
 export type PrivacySettings = z.infer<typeof privacySettingsSchema>;
+export type PaymentsSettings = z.infer<typeof paymentsSettingsSchema>;
 
 const DEFAULTS = {
   store: storeSettingsSchema.parse({ name: brand.name }),
   pricing: pricingSettingsSchema.parse({}),
   shop: shopSettingsSchema.parse({}),
   privacy: privacySettingsSchema.parse({}),
+  payments: paymentsSettingsSchema.parse({}),
 };
 
 export type SettingsKey = keyof typeof DEFAULTS;
-const SCHEMAS = { store: storeSettingsSchema, pricing: pricingSettingsSchema, shop: shopSettingsSchema, privacy: privacySettingsSchema } as const;
+const SCHEMAS = { store: storeSettingsSchema, pricing: pricingSettingsSchema, shop: shopSettingsSchema, privacy: privacySettingsSchema, payments: paymentsSettingsSchema } as const;
 
 export async function getSettings<K extends SettingsKey>(key: K, q: Queryable = db()): Promise<(typeof DEFAULTS)[K]> {
   const rows = await q<{ value: unknown }[]>`select value from settings where key = ${key}`;

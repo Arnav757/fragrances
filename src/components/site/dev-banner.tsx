@@ -1,12 +1,16 @@
 import { integrationStatus } from "@/lib/env";
+import { getSettings } from "@/lib/settings";
+import { upiReady } from "@/lib/services/upi";
 
 /** Visible warning outside production so nobody mistakes a test environment for the live service. */
-export function DevBanner() {
+export async function DevBanner() {
   const s = integrationStatus();
+  const upi = upiReady(await getSettings("payments"));
   if (s.appEnv === "production" && s.razorpay.mode === "live") return null;
   const parts: string[] = [];
   if (s.appEnv !== "production") parts.push(`${s.appEnv} environment`);
-  if (s.mockPayments) parts.push("simulated payments — no money moves");
+  if (upi) parts.push("payments by UPI QR, confirmed by hand");
+  else if (s.mockPayments) parts.push("simulated payments — no money moves");
   else if (s.razorpay.mode === "test") parts.push("Razorpay test mode");
   else if (!s.razorpay.configured) parts.push("online payments not configured");
   if (!s.ai.configured) parts.push("photo AI off — analysis uses quiz answers");

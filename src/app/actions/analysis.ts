@@ -11,6 +11,7 @@ import { clientIp } from "@/lib/security/request";
 import { toActionError, type ActionResult } from "@/lib/forms";
 import { getSettings, storeName } from "@/lib/settings";
 import { formatINR } from "@/lib/money";
+import { startUpiCheckout, submitUtr, type UpiCheckout } from "@/lib/services/upi";
 
 export async function createAnalysisAction(form: FormData): Promise<ActionResult<{ token: string }>> {
   try {
@@ -87,6 +88,26 @@ export async function startCheckoutAction(token: string, raw: unknown): Promise<
     };
   } catch (e) {
     return toActionError(e, [PaymentError, AnalysisError]);
+  }
+}
+
+export async function startUpiCheckoutAction(token: string, raw: unknown): Promise<ActionResult<UpiCheckout>> {
+  try {
+    if (!(await rateLimit(`checkout:${await clientIp()}`, 15, 3600))) throw new RateLimitError();
+    return { ok: true, data: await startUpiCheckout(token, raw) };
+  } catch (e) {
+    return toActionError(e, [PaymentError, AnalysisError]);
+  }
+}
+
+export async function submitUtrAction(token: string, orderId: string, utr: string): Promise<ActionResult> {
+  try {
+    if (!(await rateLimit(`utr:${await clientIp()}`, 10, 3600))) throw new RateLimitError();
+    await submitUtr(token, z.uuid().parse(orderId), utr);
+    revalidatePath(`/s/${token}`);
+    return { ok: true };
+  } catch (e) {
+    return toActionError(e, [PaymentError]);
   }
 }
 

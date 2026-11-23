@@ -108,7 +108,7 @@ export type MarkPaidResult = { result: "paid" | "already_paid" | "duplicate_paym
  * Idempotently records a captured payment, unlocks the report and starts the stylist review clock.
  * Safe to call from both the checkout callback and the webhook in any order, any number of times.
  */
-export async function markOrderPaid(gatewayOrderId: string, payment: GatewayPayment, provider: "razorpay" | "mock"): Promise<MarkPaidResult> {
+export async function markOrderPaid(gatewayOrderId: string, payment: GatewayPayment, provider: "razorpay" | "mock" | "upi"): Promise<MarkPaidResult> {
   const pricing = await getSettings("pricing");
   const res = await db().begin(async (tx) => {
     const o = await loadOrder({ gatewayOrderId }, tx, true);
@@ -207,9 +207,10 @@ export async function refundOrder(orderId: string, actorId: string, reason: stri
   const o = await getOrder(orderId);
   if (!o) throw new PaymentError("Order not found.");
   if (o.status !== "paid") throw new PaymentError("Only paid orders can be refunded.");
-  const pay = await db()<{ providerPaymentId: string; provider: "razorpay" | "mock" }[]>`
+  const pay = await db()<{ providerPaymentId: string; provider: "razorpay" | "mock" | "upi" }[]>`
     select provider_payment_id, provider from payments where order_id = ${o.id} and status = 'captured' order by created_at desc limit 1`;
   if (!pay[0]) throw new PaymentError("No captured payment found for this order.");
+  if (pay[0].provider === "upi") return recordManualRefund(o, actorId, reason);
   const gateway = getGateway();
   if (!gateway || gateway.provider !== pay[0].provider) throw new PaymentError("The payment provider for this order isn't configured.");
   const r = await gateway.refund(pay[0].providerPaymentId, o.totalPaise, { order_number: o.orderNumber });
@@ -220,6 +221,19 @@ export async function refundOrder(orderId: string, actorId: string, reason: stri
     await tx`insert into analysis_events (analysis_id, message, customer_visible, actor_id) values (${o.analysisId}, 'Refund initiated', true, ${actorId})`;
   });
   await audit(actorId, "order.refund", "order", o.id, { amountPaise: o.totalPaise, reason });
+  const a = await db()<{ ref: string; firstName: string }[]>`select ref, first_name from analyses where id = ${o.analysisId}`;
+  const ctx = await emailContext();
+  await sendEmail(o.contactEmail, "refund", templates.refund(ctx, { name: a[0]!.firstName, ref: a[0]!.ref, amountPaise: o.totalPaise }), o.analysisId);
+}
+
+/** UPI payments are refunded by the admin from their own UPI app; this records it and tells the customer. */
+async function recordManualRefund(o: PayableOrder, actorId: string, reason: string) {
+  await db().begin(async (tx) => {
+    await tx`insert into refunds (order_id, amount_paise, status, reason, created_by) values (${o.id}, ${o.totalPaise}, 'manual', ${reason || null}, ${actorId})`;
+    await tx`update orders set status = 'refunded', refunded_at = now() where id = ${o.id}`;
+    await tx`insert into analysis_events (analysis_id, message, customer_visible, actor_id) values (${o.analysisId}, 'Refund sent by UPI', true, ${actorId})`;
+  });
+  await audit(actorId, "order.refund", "order", o.id, { amountPaise: o.totalPaise, reason, manual: true });
   const a = await db()<{ ref: string; firstName: string }[]>`select ref, first_name from analyses where id = ${o.analysisId}`;
   const ctx = await emailContext();
   await sendEmail(o.contactEmail, "refund", templates.refund(ctx, { name: a[0]!.firstName, ref: a[0]!.ref, amountPaise: o.totalPaise }), o.analysisId);

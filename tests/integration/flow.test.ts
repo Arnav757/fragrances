@@ -19,6 +19,7 @@ import { checkoutSignature } from "@/lib/payments/gateway";
 import { getMockGateway } from "@/lib/payments/gateway";
 import { hmacSha256Hex } from "@/lib/auth/crypto";
 import { saveSettings } from "@/lib/settings";
+import { confirmUpi, pendingUpiFor, rejectUpi, startUpiCheckout, submitUtr, upiUri } from "@/lib/services/upi";
 
 const checkout = (over: Record<string, unknown> = {}) => ({
   contactName: "Test Buyer",
@@ -169,6 +170,64 @@ describe("payment", () => {
     expect((await handleRazorpayWebhook(body, sig, "evt_1")).body).toBe("duplicate");
     expect((await getAnalysisByToken(a.token))!.status).toBe("paid");
     expect(checkoutSignature("s", "o", "p")).toHaveLength(64);
+  });
+});
+
+describe("manual UPI payment", () => {
+  const settings = { upiEnabled: true, upiId: "shop@okbank", upiName: "Test Store" };
+
+  it("builds a UPI link with the exact amount and order number", () => {
+    const u = upiUri(settings, "FORMA", 149900, "FMO-7");
+    expect(u).toMatch(/^upi:\/\/pay\?/);
+    const p = new URLSearchParams(u.split("?")[1]);
+    expect(p.get("pa")).toBe("shop@okbank");
+    expect(p.get("am")).toBe("1499.00");
+    expect(p.get("cu")).toBe("INR");
+    expect(p.get("tn")).toContain("FMO-7");
+  });
+
+  it("refuses to start while UPI is switched off", async () => {
+    await saveSettings("payments", { ...settings, upiEnabled: false }, null);
+    const a = await newAnalysis();
+    await expect(startUpiCheckout(a.token, checkout())).rejects.toBeInstanceOf(PaymentError);
+  });
+
+  it("keeps the report locked until an admin confirms, then unlocks and emails", async () => {
+    await saveSettings("payments", settings, null);
+    const admin = await staff();
+    const a = await newAnalysis();
+    const s = await startUpiCheckout(a.token, checkout());
+    expect(s.qrSvg).toContain("<svg");
+    expect(s.amountPaise).toBe(149900);
+
+    await expect(submitUtr(a.token, s.orderId, "12345")).rejects.toThrow(/12-digit/);
+    await submitUtr(a.token, s.orderId, "4123 4567 8901");
+    expect((await getAnalysisByToken(a.token))!.status).toBe("preview");
+    const p = await pendingUpiFor(a.id);
+    expect(p?.utr).toBe("412345678901");
+    await expect(submitUtr(a.token, s.orderId, "999999999999")).rejects.toThrow(/already have a payment/);
+
+    const r = await confirmUpi(p!.paymentId, admin);
+    expect(r.result).toBe("paid");
+    const after = await getAnalysisByToken(a.token);
+    expect(after!.status).toBe("paid");
+    expect(await pendingUpiFor(a.id)).toBeNull();
+    const mail = await db()`select 1 from email_outbox where analysis_id = ${a.id} and template = 'payment_confirmation'`;
+    expect(mail.length).toBe(1);
+    await expect(confirmUpi(p!.paymentId, admin)).rejects.toBeInstanceOf(PaymentError);
+  });
+
+  it("lets the customer try again after a rejection, but never reuses a UTR", async () => {
+    await saveSettings("payments", settings, null);
+    const admin = await staff();
+    const a = await newAnalysis();
+    const s = await startUpiCheckout(a.token, checkout());
+    await submitUtr(a.token, s.orderId, "512345678901");
+    await rejectUpi((await pendingUpiFor(a.id))!.paymentId, admin, "not found");
+    expect(await pendingUpiFor(a.id)).toBeNull();
+    await expect(submitUtr(a.token, s.orderId, "512345678901")).rejects.toThrow(/already been submitted/);
+    await submitUtr(a.token, s.orderId, "612345678901");
+    expect((await pendingUpiFor(a.id))?.utr).toBe("612345678901");
   });
 });
 

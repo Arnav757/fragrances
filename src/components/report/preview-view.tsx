@@ -3,7 +3,7 @@ import type { ReportPreview } from "@/lib/style/report";
 import type { Observations } from "@/lib/style/types";
 import { Container } from "../ui/misc";
 import { ConfidencePill, List, OutfitCard, SwatchChip } from "./parts";
-import { CheckoutPanel, type PlanOption } from "./checkout-panel";
+import { CheckoutPanel, type PendingUpiView, type PlanOption } from "./checkout-panel";
 import { EmailPreviewForm } from "./small-forms";
 import { formatINR } from "@/lib/money";
 
@@ -33,6 +33,7 @@ export function PreviewView({
   aiNote,
   plans,
   mode,
+  pendingUpi,
 }: {
   token: string;
   firstName: string;
@@ -41,7 +42,8 @@ export function PreviewView({
   source: "ai" | "quiz";
   aiNote: string | null;
   plans: PlanOption[];
-  mode: "razorpay" | "mock" | "off";
+  mode: "razorpay" | "mock" | "upi" | "off";
+  pendingUpi?: PendingUpiView | null;
 }) {
   const cheapest = Math.min(...plans.map((p) => p.pricePaise));
   return (
@@ -145,7 +147,7 @@ export function PreviewView({
         </div>
 
         <aside className="lg:sticky lg:top-24 lg:self-start">
-          <CheckoutPanel token={token} plans={plans} mode={mode} firstName={firstName} />
+          <CheckoutPanel token={token} plans={plans} mode={mode} firstName={firstName} pendingUpi={pendingUpi ?? null} />
           <ul className="mt-5 space-y-2 px-1 text-sm text-charcoal">
             {[
               `All ${preview.outfits.length + preview.lockedOutfits} outfits, with shop links`,
