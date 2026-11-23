@@ -29,10 +29,25 @@ export function SwatchGrid({ swatches, cols = "grid-cols-4 sm:grid-cols-5" }: { 
 export function Section({ id, eyebrow, title, children, className }: { id?: string; eyebrow: string; title: ReactNode; children: ReactNode; className?: string }) {
   return (
     <section id={id} className={cn("scroll-mt-24 border-t border-line py-12 sm:py-16", className)}>
-      <p className="eyebrow mb-3">{eyebrow}</p>
-      <h2 className="mb-8 text-3xl leading-[1.05] sm:text-4xl">{title}</h2>
+      <SectionLabel eyebrow={eyebrow} />
+      <h2 className="mb-8 text-3xl leading-[1.02] font-extrabold tracking-[-0.04em] sm:text-5xl">
+        {title}
+        <span className="text-gold">.</span>
+      </h2>
       {children}
     </section>
+  );
+}
+
+/** "01 · Body frame" → an orange number badge plus the label. */
+function SectionLabel({ eyebrow }: { eyebrow: string }) {
+  const m = eyebrow.match(/^(\d+)\s*·\s*(.+)$/);
+  if (!m) return <p className="eyebrow mb-3">{eyebrow}</p>;
+  return (
+    <p className="mb-4 flex items-center gap-3">
+      <span className="grid h-9 w-9 place-items-center rounded-full bg-gold font-display text-sm font-extrabold text-ink">{m[1]}</span>
+      <span className="eyebrow">{m[2]}</span>
+    </p>
   );
 }
 

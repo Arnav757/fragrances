@@ -123,10 +123,10 @@ export function ReportToolbar() {
   }
   return (
     <div className="no-print flex gap-2">
-      <button type="button" onClick={copy} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3.5 py-2 text-sm hover:border-ink">
+      <button type="button" onClick={copy} className="inline-flex items-center gap-1.5 rounded-full border border-ink/80 bg-white px-3.5 py-2 text-sm text-ink hover:bg-ink hover:text-white">
         <Link2 className="h-4 w-4" aria-hidden /> Copy link
       </button>
-      <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3.5 py-2 text-sm hover:border-ink">
+      <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-full border border-ink/80 bg-white px-3.5 py-2 text-sm text-ink hover:bg-ink hover:text-white">
         <Printer className="h-4 w-4" aria-hidden /> Save as PDF
       </button>
     </div>

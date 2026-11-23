@@ -186,3 +186,22 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Slow orbit for decorative colour dots (sample report hero). */
+@keyframes orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.animate-orbit {
+  animation: orbit 18s linear infinite;
+}
+.animate-orbit-rev {
+  animation: orbit 18s linear infinite reverse;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-orbit,
+  .animate-orbit-rev {
+    animation: none;
+  }
+}
