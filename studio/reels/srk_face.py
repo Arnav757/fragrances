@@ -72,13 +72,13 @@ class Reel(base.Reel):
         p4 = self.ph["04"]
         self.cam_wide = (p4.w / 2, p4.h * 0.45, cover_scale(p4.w, p4.h))
         fc = ((L[234][0] + L[454][0]) / 2, (L[10][1] + L[152][1]) / 2 - 60)
-        self.cam_face = (fc[0], fc[1], 1.62)
+        self.cam_face = (fc[0], fc[1], 0.92)
         ec = ((L[70][0] + L[300][0]) / 2, (L[105][1] + L[145][1]) / 2)
-        self.cam_eyes = (ec[0], ec[1], 2.55)
-        self.cam_hair = (fc[0], L[10][1] - 60, 1.32)
-        self.cam_fifths = (fc[0], self.eye_y + 40, 2.0)
+        self.cam_eyes = (ec[0], ec[1], 1.55)
+        self.cam_hair = (fc[0], L[10][1] + 40, 0.8)
+        self.cam_fifths = (fc[0], self.eye_y + 40, 1.08)
         L7 = self.LM["07"]
-        self.cam7_eyes = ((L7[33][0] + L7[263][0]) / 2, (L7[159][1] + L7[386][1]) / 2, 2.2)
+        self.cam7_eyes = ((L7[33][0] + L7[263][0]) / 2, (L7[159][1] + L7[386][1]) / 2 + 120, 1.12)
         self._hair_mask(seg)
 
     # ------------------------------------------------------------ prep
@@ -91,7 +91,7 @@ class Reel(base.Reel):
         person = seg.process(cv2.cvtColor(cv2.resize(small, (512, 512)), cv2.COLOR_BGR2RGB)).segmentation_mask
         person = cv2.resize(person, (small.shape[1], small.shape[0])) > 0.4
         grey = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-        dark = grey < 95
+        dark = grey < 70
         yy = np.arange(small.shape[0])[:, None]
         brow_top = min(L[i][1] for i in (70, 63, 105, 66, 107, 336, 296, 334, 293, 300)) - 6
         m = person & dark & (yy < brow_top)
@@ -383,7 +383,7 @@ class Reel(base.Reel):
                 c = self.cam7_eyes
                 s = c[2] * (1 + 0.05 * prog(k, 0, s1 - cut_at))
                 cx = min(max(c[0], W / 2 / s), p7.w - W / 2 / s)
-                paint_cam(ctx, p7.full, p7.w, p7.h, cx, c[1] + 160, s, ox=ox)
+                paint_cam(ctx, p7.full, p7.w, p7.h, cx, c[1], s, ox=ox)
 
             self.whip(ctx, lambda ox: self.shot_face(ctx, self.cam_eyes, ox), b_, prog(k, 0, 0.28), direction=-1)
             self.letterbox(ctx, e_out(prog(k, 0.15, 0.4)), 170)
@@ -414,7 +414,7 @@ class Reel(base.Reel):
                 ctx.save()
                 ctx.rectangle(0, 0, W, yc)
                 ctx.clip()
-                breathe = 0.33 + 0.08 * math.sin(age * 5)
+                breathe = 0.2 + 0.05 * math.sin(age * 5)
                 fade = 1 - 0.55 * prog(t, t_soft or s1, 0.4) if t_soft else 1
                 ctx.save()
                 ctx.translate(W / 2, H / 2)
@@ -585,7 +585,7 @@ class Reel(base.Reel):
             self.section_title(ctx, "", "ATTITUDE", t, t_att - 0.1, dur=0.85, kicker="THE REAL SECRET")
             return
         shots = [("02", t_black, (0.36, 0.3), "ALL BLACK", INK, WHITE),
-                 ("03", t_red, (0.5, 0.36), "ON THE RED", RED, WHITE),
+                 ("03", t_red, (0.5, 0.36), "RED CARPET", RED, WHITE),
                  ("06", t_white - 0.08, (0.62, 0.3), "WHITE KURTA", WHITE, INK),
                  ("05", t_wears - 0.08, (0.45, 0.3), "WEARS IT", ORANGE, WHITE),
                  ("07", t_owns - 0.1, (0.45, 0.28), "OWNS THE ROOM", ORANGE, WHITE)]
@@ -608,9 +608,6 @@ class Reel(base.Reel):
             self.shot_parallax(ctx, key, k if k > 0 else t - t_att, end - st, foc, push=0.1, drift=1 if cur % 2 else -1)
         if key == "07":
             self.letterbox(ctx, e_out(prog(k, 0.1, 0.4)), 150)
-            # crown above his head on "owns the room"
-            d = e_back(prog(k, 0.25, 0.45), 2.4)
-            self.crown(ctx, W / 2 + 30, 560 - lerp(220, 0, d), 120, a=clamp((k - 0.25) / 0.12))
         self.pill(ctx, lab, W / 2, 1300, k - 0.18, rgb_bg=bg, rgb_fg=fg, size=44)
         # a running counter of the looks in the corner
         self.text(ctx, f"LOOK {cur + 1:02d}/05", W - 60, 230, 26, font=MONO, align="r", a=0.85, track=2)
