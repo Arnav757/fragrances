@@ -101,6 +101,20 @@ class Reel(base.Reel):
         if n > 1:
             m = (lab == 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))).astype(np.uint8) * 255
         self.hair_small = m
+        cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        c = max(cs, key=cv2.contourArea)
+        c = cv2.approxPolyDP(c, 1.5, True)[:, 0, :].astype(float) * 3
+        # start the trace at the crown (top-most point) so it runs down both sides
+        i0 = int(np.argmin(c[:, 1]))
+        c = np.vstack([c[i0:], c[:i0 + 1]])
+        cut = (brow_top - 4) * 3
+        keep = c[:, 1] < cut
+        bad = np.nonzero(~keep)[0]
+        if len(bad):
+            run_a, run_b = c[:bad[0]], c[bad[-1] + 1:][::-1]
+        else:
+            run_a, run_b = c[: len(c) // 2], c[len(c) // 2:][::-1]
+        self.hair_runs = [[tuple(q) for q in r] for r in (run_a, run_b) if len(r) > 1]
         big = cv2.GaussianBlur(cv2.resize(m, (ph.w, ph.h)), (0, 0), 4).astype(np.float32) / 255
         tint = np.zeros((ph.h, ph.w, 4), np.uint8)
         tint[..., 0], tint[..., 1], tint[..., 2] = int(LIME[2] * 255), int(LIME[1] * 255), int(LIME[0] * 255)
@@ -414,15 +428,17 @@ class Reel(base.Reel):
                 ctx.save()
                 ctx.rectangle(0, 0, W, yc)
                 ctx.clip()
-                breathe = 0.2 + 0.05 * math.sin(age * 5)
-                fade = 1 - 0.55 * prog(t, t_soft or s1, 0.4) if t_soft else 1
-                ctx.save()
-                ctx.translate(W / 2, H / 2)
-                ctx.scale(cam[2], cam[2])
-                ctx.translate(-cam[0], -cam[1])
-                ctx.set_source_surface(self.hair_tint, 0, 0)
-                ctx.paint_with_alpha(breathe * fade)
                 ctx.restore()
+                fade = 1 - 0.5 * prog(t, t_soft, 0.4) if t_soft else 1.0
+                ctx.save()
+                ctx.push_group()
+                for run in self.hair_runs:
+                    pts = [self.to_canvas(q, cam) for q in run]
+                    end = self.dotted(ctx, pts, e_io(prog(age, 0, 1.0)), rgb=LIME, width=6, dash=(3, 12))
+                    if end and age < 1.0:
+                        self.node(ctx, *end, 10, rgb=LIME)
+                ctx.pop_group_to_source()
+                ctx.paint_with_alpha(fade)
                 ctx.restore()
                 self.event("hair glow", t_thick)
             self.pill(ctx, "THICK", 200, 520, t - t_thick, size=38, anchor="l", rgb_bg=LIME, rgb_fg=INK)
@@ -450,7 +466,8 @@ class Reel(base.Reel):
                     if p < 1:
                         self.node(ctx, *pts[n - 1], 6)
                 # arrow on the tip of the fringe
-                tip = max((st[-1] for st in self.strands), key=lambda q: q[1])
+                mid = self.strands[len(self.strands) // 4: 3 * len(self.strands) // 4 + 1] or self.strands
+                tip = max((st[-1] for st in mid), key=lambda q: q[1])
                 X, Y = self.to_canvas(tip, cam)
                 a = e_back(prog(age, 0.5, 0.35))
                 if a > 0:
@@ -781,7 +798,7 @@ def build_audio(reel: Reel, out: Path):
 
     # tabla (keherwa): dha ge na ti | na ka dhi na — synthesized dayan / bayan strokes, plus a modern sub kick
     def dayan(f=520, g=1.0, dec=0.09):
-        L_ = int(0.35 * SR)
+        L_ = int(0.6 * SR)
         tt = np.arange(L_) / SR
         s = sum(a * np.sin(2 * np.pi * f * m * tt) * np.exp(-tt / (dec / m ** 0.5)) for m, a in ((1, 1), (2, 0.45), (3, 0.25), (4.2, 0.12)))
         s[:int(0.004 * SR)] += rng.uniform(-0.6, 0.6, int(0.004 * SR))
