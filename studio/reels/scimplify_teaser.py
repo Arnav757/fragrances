@@ -111,6 +111,8 @@ class Teaser:
         y = y ** 1.12
         y = 0.5 + (y - 0.5) * 1.08
         self.lut = (np.clip(y, 0, 1) * 255).astype(np.uint8)
+        # timings (overridable): fade-up, focus pull, sink to black, push length
+        self.fade_in, self.focus, self.sink, self.push_len = (0.0, 1.0), (0.15, 1.1), (6.45, 0.95), FOOT_END
 
     # ------------------------------------------------------------ footage + grade
     def footage(self, t):
@@ -128,13 +130,13 @@ class Teaser:
         soft = cv2.GaussianBlur(f, (0, 0), 3.2)
         f = (f * (1 - m) + soft * m).astype(np.uint8)
         # slow push-in on top of the camera move, centred a little left (bench under the lamp)
-        z = 1.02 + 0.045 * (t / FOOT_END)
+        z = 1.02 + 0.045 * (t / self.push_len)
         sc = W / f.shape[1] * z
         cxs, cys = f.shape[1] * 0.47, f.shape[0] * 0.48
         M = np.array([[sc, 0, W / 2 - cxs * sc], [0, sc, H / 2 - cys * sc]], np.float32)
         f = cv2.warpAffine(f, M, (W, H), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REFLECT)
         # focus pull at the open: starts soft, resolves
-        blur = 9 * (1 - e_out(prog(t, 0.15, 1.1)))
+        blur = 9 * (1 - e_out(prog(t, *self.focus)))
         if blur > 0.3:
             f = cv2.GaussianBlur(f, (0, 0), blur)
         # grade
@@ -152,7 +154,7 @@ class Teaser:
         g = cv2.resize(self.grain[int(t * FPS) % len(self.grain)], (W, H), interpolation=cv2.INTER_LINEAR)[..., None]
         f = f + g * 0.022 * (0.6 + 0.4 * (1 - lum))
         # fade up / sink to black
-        f = f * e_io(prog(t, 0.0, 1.0)) * (1 - e_io(prog(t, 6.45, 0.95)))
+        f = f * e_io(prog(t, *self.fade_in)) * (1 - e_io(prog(t, *self.sink)))
         return np.clip(f * 255, 0, 255).astype(np.uint8)
 
     # ------------------------------------------------------------ overlays
