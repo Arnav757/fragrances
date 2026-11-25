@@ -28,9 +28,13 @@ from render import find_word, rounded  # noqa: E402
 W, H, FPS = 1080, 1920, 30
 LEAD = 0.35
 TAIL = 2.4
+# FORMA palette
 ORANGE = (1.0, 0x4F / 255, 0x2A / 255)
+COBALT = (0x25 / 255, 0x57 / 255, 1.0)
+LIME = (0xC7 / 255, 1.0, 0x43 / 255)
+ICE = (0xA5 / 255, 0xE8 / 255, 1.0)
 WHITE = (1, 1, 1)
-INK = (0.06, 0.06, 0.07)
+INK = (0x17 / 255, 0x19 / 255, 0x1D / 255)
 DISPLAY = "Inter Tight Heavy"
 SANS = "Inter Tight"
 SERIF = "Playfair Display"
@@ -145,7 +149,7 @@ class Reel:
         self.grain = [cv2.GaussianBlur(rng.normal(0, 1, (H // 2, W // 2)).astype(np.float32), (0, 0), 0.7) for _ in range(6)]
         yy, xx = np.mgrid[0:H, 0:W]
         r = np.hypot((xx - W / 2) / (W / 2), (yy - H / 2) / (H / 2))
-        self.vig = np.clip(r - 0.55, 0, 1) ** 1.6 * 0.75
+        self.vig = np.clip(r - 0.6, 0, 1) ** 1.6 * 0.5
         # measured facts for the graphics
         L = self.L
         brow = (L[55][1] + L[285][1]) / 2
@@ -263,32 +267,43 @@ class Reel:
         self.text(ctx, s, bx + pw / 2, y + size * 0.36, size, rgb=rgb_fg, a=a, track=3, shadow=False)
         ctx.restore()
 
-    def section_title(self, ctx, num, word, t, t0, dur=0.75):
-        """Full-screen punch: dims the photo, big orange number, heavy word slides in, then clears."""
+    def section_title(self, ctx, num, word, t, t0, dur=0.75, kicker=""):
+        """White brand panel wipes up over the photo: orange number badge, heavy ink word with an orange full stop."""
         k = t - t0
-        if k < 0 or k > dur + 0.25:
+        if k < 0 or k > dur + 0.3:
             return
-        a_in = e_out(prog(k, 0, 0.18))
-        a_out = 1 - e_in(prog(k, dur, 0.25))
-        a = a_in * a_out
-        ctx.set_source_rgba(0, 0, 0, 0.62 * a)
-        ctx.paint()
-        if k < 0.07:  # flash frame
-            ctx.set_source_rgba(1, 1, 1, 0.55 * (1 - k / 0.07))
-            ctx.paint()
-        y = H * 0.44
-        sc = lerp(1.35, 1.0, e_out(prog(k, 0, 0.35)))
+        up = e_out(prog(k, 0, 0.26))          # panel in from the bottom
+        out = e_in(prog(k, dur, 0.28))         # panel leaves through the top
+        top = H * (1 - up) - H * out
         ctx.save()
-        ctx.translate(W / 2, y)
-        ctx.scale(sc, sc)
-        ctx.translate(-W / 2, -y)
-        if num:
-            self.text(ctx, num, W / 2, y - 40, 190, rgb=ORANGE, a=a)
-        dx = (1 - e_out(prog(k, 0.05, 0.4))) * 220
-        ctx.save()
-        ctx.rectangle(0, y - 10, W, 200)
+        ctx.rectangle(0, top, W, H)
         ctx.clip()
-        self.text(ctx, word, W / 2 + dx, y + 120, 112 if len(word) < 11 else 92, a=a, track=4)
+        ctx.set_source_rgb(1, 1, 1)
+        ctx.paint()
+        # thin orange rule on the leading edge
+        ctx.set_source_rgb(*ORANGE)
+        ctx.rectangle(0, top, W, 10)
+        ctx.fill()
+        cy = top + H * 0.46
+        a = clamp(k / 0.12)
+        if num:
+            r_ = 92 * e_back(prog(k, 0.08, 0.35), 2.0)
+            ctx.set_source_rgb(*ORANGE)
+            ctx.arc(W / 2, cy - 170, r_, 0, 2 * math.pi)
+            ctx.fill()
+            self.text(ctx, num, W / 2, cy - 170 + 34, 96, rgb=WHITE, a=a, shadow=False)
+        if kicker:
+            self.text(ctx, kicker, W / 2, cy - 120, 34, font=MONO, rgb=INK, a=0.7 * a, track=4, shadow=False)
+        size = 118 if len(word) < 9 else (96 if len(word) < 13 else 84)
+        dy = (1 - e_out(prog(k, 0.1, 0.4))) * 70
+        ctx.save()
+        ctx.rectangle(0, cy + 40 - size * 0.95, W, size * 1.1)
+        ctx.clip()
+        tw = self.text(ctx, word, W / 2 - size * 0.12, cy + 40 + dy, size, rgb=INK, track=1, shadow=False)
+        # the full stop is the brand's orange dot
+        ctx.set_source_rgb(*ORANGE)
+        ctx.arc(W / 2 - size * 0.12 + tw / 2 + size * 0.2, cy + 40 + dy - size * 0.09, size * 0.11, 0, 2 * math.pi)
+        ctx.fill()
         ctx.restore()
         ctx.restore()
 
@@ -377,7 +392,7 @@ class Reel:
             ctx.fill()
             # headline words pop as they're said
             rows = [("WHY IS HIS", ["Why", "does"]), ("FACE SO", ["face"]), ("ATTRACTIVE?", ["attractive"])]
-            y = 330
+            y = 360
             for txt, keys in rows:
                 tk = min(self._first(keys, 0) or 99, 99)
                 age = t - tk + 0.08
@@ -387,14 +402,22 @@ class Reel:
                     ctx.translate(W / 2, y - 40)
                     ctx.scale(k, k)
                     ctx.translate(-W / 2, -(y - 40))
-                    col = ORANGE if txt.startswith("ATTRACTIVE") else WHITE
-                    self.text(ctx, txt, W / 2, y, 118, rgb=col, a=clamp(age / 0.1), track=2)
+                    hot = txt.startswith("ATTRACTIVE")
+                    ctx.select_font_face(DISPLAY)
+                    ctx.set_font_size(104)
+                    tw = ctx.text_extents(txt).x_advance + 2 * (len(txt) - 1)
+                    bw = (tw + 60) * e_out(prog(age, 0, 0.22))
+                    ctx.set_source_rgba(*(ORANGE if hot else WHITE), clamp(age / 0.08))
+                    ctx.rectangle(W / 2 - (tw + 60) / 2, y - 92, bw, 118)
+                    ctx.fill()
+                    if bw > tw * 0.6:
+                        self.text(ctx, txt, W / 2, y, 104, rgb=WHITE if hot else INK, a=clamp((bw - tw * 0.6) / (tw * 0.4)), track=2, shadow=False)
                     ctx.restore()
-                y += 128
+                y += 132
             # name tag on "Sidharth"
             tn = self._first(["Sidharth"], 0)
             if tn and t > tn:
-                self.pill(ctx, "SIDHARTH MALHOTRA", W / 2, 1180, t - tn, rgb_bg=WHITE, rgb_fg=INK, size=30)
+                self.pill(ctx, "SIDHARTH MALHOTRA", W / 2, 1200, t - tn, rgb_bg=INK, rgb_fg=WHITE, size=32)
         else:
             # cut to the frontal shot; a face-mesh scan sweeps down
             k = t - t_break
@@ -402,7 +425,7 @@ class Reel:
             cam = self.cam_lerp(self.cam_wide, self.cam_face, prog(k, 0, 0.9))
             self.shot_face(ctx, cam)
             self.mesh_scan(ctx, cam, prog(k, 0.15, 1.1), fade=1 - prog(k, dur - 0.35, 0.3))
-            self.pill(ctx, "BREAKDOWN", W / 2, 300, k - 0.1, size=34)
+            self.pill(ctx, "THE BREAKDOWN", W / 2, 300, k - 0.1, rgb_bg=LIME, rgb_fg=INK, size=36)
             self.event("cut → frontal scan", t_break)
 
     def _has(self, tok):
@@ -504,7 +527,7 @@ class Reel:
                     ctx.set_source_rgb(*ORANGE)
                     ctx.rectangle(mid - (mid - x0) * pw, y1 - 3, (x1 - x0) * pw, 6)
                     ctx.fill()
-                    self.pill(ctx, f"JAW WIDTH {self.jaw_ratio}% OF FACE", W / 2, 1300, age - 0.15, size=30)
+                    self.pill(ctx, f"JAW WIDTH = {self.jaw_ratio}% OF FACE", W / 2, 1300, age - 0.15, rgb_bg=COBALT, size=32)
             self.pill(ctx, "JAWLINE", W / 2, 300, t - (t_draw + 0.1), size=40)
             self.section_title(ctx, "01", "JAWLINE", t, t_title)
         else:
@@ -537,7 +560,7 @@ class Reel:
                 ctx.fill()
                 ctx.restore()
                 cl = 50
-                ctx.set_source_rgba(1, 1, 1, ap)
+                ctx.set_source_rgba(*ORANGE, ap)
                 ctx.set_line_width(5)
                 for (cx, cy, dx, dy) in ((x0, y0, 1, 1), (x1, y0, -1, 1), (x0, y1, 1, -1), (x1, y1, -1, -1)):
                     ctx.move_to(cx + dx * cl, cy)
@@ -576,12 +599,12 @@ class Reel:
                     self.pill(ctx, "LOW-SET", W / 2 - 190, y1 + 90, age, size=32)
                     self.event("brow gap brackets on 'low'", t_low)
             if ts:
-                self.pill(ctx, "STRAIGHT", W / 2 + 190, y1 + 90, t - ts, size=32, rgb_bg=WHITE, rgb_fg=INK)
+                self.pill(ctx, "STRAIGHT", W / 2 + 190, y1 + 90, t - ts, size=32, rgb_bg=COBALT)
             self.section_title(ctx, "02", "EYE AREA", t, s0)
         else:
             k = t - cut_at
             self.whip(ctx, lambda ox: self.shot_face(ctx, self.cam_eyes, ox), lambda ox: self.shot_parallax(ctx, "08", k, s1 - cut_at, (0.5, 0.26), ox=ox, drift=-1), prog(k, 0, 0.28), direction=-1)
-            self.pill(ctx, "CALM · INTENSE", W / 2, 1300, k - 0.25, size=34)
+            self.pill(ctx, "CALM · INTENSE", W / 2, 1300, k - 0.25, rgb_bg=LIME, rgb_fg=INK, size=36)
             self.event("whip → cutaway (eyes)", cut_at)
 
     # 03 FACIAL THIRDS
@@ -602,7 +625,7 @@ class Reel:
                 p = e_io(prog(t, line_t[i], 0.45))
                 self.dotted(ctx, [(xl, y), (xr, y)], p, width=4, dash=(10, 10), glow=False)
             # bands: tint + bracket + percentage counting up
-            cols = [(1, 0.31, 0.16), (1, 0.55, 0.3), (1, 0.31, 0.16)]
+            cols = [ICE, LIME, ORANGE]
             pulse = 0.0
             if t_nothing:
                 pulse = 0.5 + 0.5 * math.sin(max(0, t - t_nothing) * 9) if t > t_nothing else 0
@@ -613,7 +636,7 @@ class Reel:
                     continue
                 y0, y1 = ys[i], ys[i + 1]
                 a = e_out(prog(age, 0, 0.3))
-                ctx.set_source_rgba(*cols[i], (0.16 + 0.12 * pulse) * a)
+                ctx.set_source_rgba(*cols[i], (0.22 + 0.12 * pulse) * a)
                 ctx.rectangle(xl, y0, xr - xl, y1 - y0)
                 ctx.fill()
                 bx = xr + 18
@@ -629,7 +652,7 @@ class Reel:
                 self.text(ctx, ["FOREHEAD", "MID-FACE", "LOWER FACE"][i], xl + 14, y0 + 44, 28, font=DISPLAY, align="l", a=a, track=2)
                 self.event(f"third {i + 1} on its word", tk)
             if t_nothing:
-                self.pill(ctx, "≈ 1/3 · 1/3 · 1/3", W / 2, 1330, t - t_nothing, size=38)
+                self.pill(ctx, "≈ 1/3 · 1/3 · 1/3", W / 2, 1330, t - t_nothing, rgb_bg=INK, size=40)
             self.section_title(ctx, "03", "FACIAL THIRDS", t, s0)
         else:
             k = t - cut_at
@@ -665,12 +688,12 @@ class Reel:
                 ctx.stroke()
                 self.pill(ctx, key.upper(), lx, ly, age - 0.2, size=40, anchor="l" if side == "l" else "r")
                 self.event(f"label {key.upper()}", tt)
-            self.section_title(ctx, "", "GROOMING", t, t_g or s0 + 0.8, dur=0.9)
+            self.section_title(ctx, "", "GROOMING", t, t_g or s0 + 0.8, dur=0.9, kicker="THE REAL SECRET")
             if t_g and t >= t_g - 0.2:
                 pass
             # opening line of the section: "But the real secret is…" — kicker
             if t < (t_g or s0 + 0.8):
-                self.pill(ctx, "THE REAL SECRET", W / 2, 300, t - s0 - 0.05, size=40)
+                self.pill(ctx, "THE REAL SECRET", W / 2, 300, t - s0 - 0.05, rgb_bg=INK, size=40)
         else:
             # "make every feature stand out more": rapid-fire cutaways on the beat
             k = t - t_every
@@ -683,7 +706,7 @@ class Reel:
                 ctx.set_source_rgba(1, 1, 1, 0.45 * (1 - kk / 0.06))
                 ctx.paint()
             if seq[i] == "07":
-                self.pill(ctx, "THE BEARD FRAMES THE JAW", W / 2, 1300, kk - 0.05, size=30)
+                self.pill(ctx, "THE BEARD FRAMES THE JAW", W / 2, 1300, kk - 0.05, rgb_bg=LIME, rgb_fg=INK, size=32)
             self.event("montage cut", t_every + i * dur)
 
     # TURN
@@ -724,93 +747,130 @@ class Reel:
                 self.event("frame brackets on 'framed'", tf)
             self.pill(ctx, "FRAMING: YOURS TO CHANGE", W / 2, 300, t - t_but - 0.1, size=32)
 
-    # END
+    # END — light-mode brand card
     def sc_end(self, ctx, t):
         s0 = self.Ls[6]
         k = t - s0
-        # blurred background of the hook photo
-        ph = self.ph["02"]
-        paint_cam(ctx, ph.bg, ph.w, ph.h, ph.w / 2, ph.h * 0.4, cover_scale(ph.w, ph.h) * 1.1)
-        ctx.set_source_rgba(0, 0, 0, 0.45)
+        # white panel wipes up over the last frame
+        up = e_out(prog(k, 0, 0.3))
+        if up < 1:
+            self.shot_face(ctx, self.cam_wide)
+        top = H * (1 - up)
+        ctx.save()
+        ctx.rectangle(0, top, W, H)
+        ctx.clip()
+        ctx.set_source_rgb(1, 1, 1)
         ctx.paint()
-        if k < 0.07:
-            ctx.set_source_rgba(1, 1, 1, 0.5 * (1 - k / 0.07))
-            ctx.paint()
-        # three mystery cards: who's next?
-        cw, chh, gap = 250, 340, 34
+        ctx.set_source_rgb(*ORANGE)
+        ctx.rectangle(0, top, W, 10)
+        ctx.fill()
+        a = clamp((k - 0.15) / 0.2)
+        # headline: WHO'S NEXT with the ? as the accent
+        ctx.select_font_face(DISPLAY)
+        ctx.set_font_size(128)
+        tw = ctx.text_extents("WHO'S NEXT").x_advance
+        self.text(ctx, "WHO'S NEXT", W / 2 - 40, 520, 128, rgb=INK, a=a, shadow=False)
+        self.text(ctx, "?", W / 2 - 40 + tw / 2 + 50, 520, 128, rgb=ORANGE, a=a, shadow=False)
+        # three mystery cards in brand colours
+        cw, chh, gap = 250, 330, 34
+        fills = [ICE, ORANGE, LIME]
         for i in range(3):
-            age = k - 0.1 - i * 0.12
+            age = k - 0.25 - i * 0.12
             if age < 0:
                 continue
-            a = e_out(prog(age, 0, 0.3))
             x = W / 2 - (3 * cw + 2 * gap) / 2 + i * (cw + gap)
-            y = 640 + (1 - e_back(prog(age, 0, 0.45))) * 120
-            rounded(ctx, x, y, cw, chh, 26)
-            ctx.set_source_rgba(1, 1, 1, 0.1 * a)
-            ctx.fill_preserve()
-            ctx.set_source_rgba(1, 1, 1, 0.8 * a)
-            ctx.set_line_width(3)
-            ctx.stroke()
-            q = 1 + 0.06 * math.sin(k * 6 + i)
+            y = 640 + (1 - e_back(prog(age, 0, 0.45))) * 140
+            rot = math.radians((-4, 2, 5)[i]) * (1 - e_out(prog(age, 0, 0.6))) + math.radians((-3, 0, 3)[i])
             ctx.save()
+            ctx.translate(x + cw / 2, y + chh / 2)
+            ctx.rotate(rot)
+            ctx.translate(-(x + cw / 2), -(y + chh / 2))
+            rounded(ctx, x, y, cw, chh, 28)
+            ctx.set_source_rgb(*fills[i])
+            ctx.fill()
+            q = 1 + 0.06 * math.sin(k * 6 + i)
             ctx.translate(x + cw / 2, y + chh / 2)
             ctx.scale(q, q)
             ctx.translate(-(x + cw / 2), -(y + chh / 2))
-            self.text(ctx, "?", x + cw / 2, y + chh / 2 + 70, 200, rgb=ORANGE if i == 1 else WHITE, a=a)
+            self.text(ctx, "?", x + cw / 2, y + chh / 2 + 70, 200, rgb=WHITE if i == 1 else INK, shadow=False)
             ctx.restore()
-        self.text(ctx, "WHO'S NEXT?", W / 2, 470, 120, a=e_out(prog(k, 0, 0.3)), track=3)
         t_comment = self._first(["Comment"], 6) or s0 + 1.4
         age = t - t_comment
         if age > 0:
-            self.pill(ctx, "COMMENT BELOW", W / 2, 1150, age, size=46)
-            # bouncing arrow
-            by = 1290 + 18 * abs(math.sin(age * 5))
-            ctx.set_source_rgb(1, 1, 1)
-            ctx.move_to(W / 2 - 34, by)
-            ctx.line_to(W / 2 + 34, by)
-            ctx.line_to(W / 2, by + 44)
+            self.pill(ctx, "COMMENT BELOW", W / 2, 1150, age, rgb_bg=INK, size=46)
+            by = 1270 + 18 * abs(math.sin(age * 5))
+            ctx.set_source_rgb(*ORANGE)
+            ctx.move_to(W / 2 - 30, by)
+            ctx.line_to(W / 2 + 30, by)
+            ctx.line_to(W / 2, by + 40)
             ctx.close_path()
             ctx.fill()
         if k > 1.0:
-            self.text(ctx, "FOLLOW FOR PART 2", W / 2, 1450, 34, font=MONO, a=0.85 * e_out(prog(k, 1.0, 0.4)), track=3)
+            self.text(ctx, "FOLLOW FOR PART 2", W / 2, 1420, 34, font=MONO, rgb=INK, a=0.8 * e_out(prog(k, 1.0, 0.4)), track=3, shadow=False)
+        self.mark(ctx, W / 2 - 23, 1700, 64, dark=True, a=e_out(prog(k, 0.6, 0.4)))
+        ctx.restore()
+
+    def mark(self, ctx, x, y, h, dark=False, a=1.0):
+        """The F. mark (forma_mark_primary geometry: 352 x 463 units)."""
+        if a <= 0:
+            return
+        sc = h / 463
+        ctx.save()
+        ctx.translate(x, y)
+        ctx.scale(sc, sc)
+        ctx.set_source_rgba(*(INK if dark else WHITE), a)
+        ctx.move_to(0, 0)
+        for px, py in ((352, 0), (352, 93), (109, 93), (109, 182), (306, 182), (306, 275), (109, 275), (109, 463), (0, 463)):
+            ctx.line_to(px, py)
+        ctx.close_path()
+        ctx.fill()
+        ctx.set_source_rgba(*ORANGE, a)
+        ctx.arc(281, 414, 50, 0, 2 * math.pi)
+        ctx.fill()
+        ctx.restore()
 
     # ------------------------------------------------------------ overlays across the reel
     def caption(self, ctx, t):
-        """Word-by-word captions: italic serif, words appear as spoken, the current word in orange."""
-        chunks = self.chunks
+        """Word-by-word captions in Inter Tight Heavy, ink outline; the word being spoken sits on an orange block."""
         cur = None
-        for c in chunks:
+        for c in self.chunks:
             if c[0]["s"] <= t < c[-1]["n"]:
                 cur = c
         if not cur:
             return
-        ctx.select_font_face(SERIF, cairo.FONT_SLANT_ITALIC, cairo.FONT_WEIGHT_BOLD)
-        size = 66
+        ctx.select_font_face(DISPLAY)
+        size = 64
         ctx.set_font_size(size)
-        widths = [ctx.text_extents(w_["w"] + " ").x_advance for w_ in cur]
-        x = W / 2 - (sum(widths) - ctx.text_extents(" ").x_advance) / 2
-        y = 1520
+        sp = ctx.text_extents(" ").x_advance + 30
+        widths = [ctx.text_extents(w_["w"]).x_advance for w_ in cur]
+        x = W / 2 - (sum(widths) + sp * (len(cur) - 1)) / 2
+        y = 1530
         for w_, wd in zip(cur, widths):
             age = t - w_["s"]
             if age < 0:
                 break
-            k = e_back(prog(age, 0, 0.18), 2.0)
+            k = e_back(prog(age, 0, 0.16), 2.2)
             active = w_["s"] <= t < w_["e"] + 0.05
             ctx.save()
-            ctx.translate(x + wd / 2, y)
+            ctx.translate(x + wd / 2, y - size * 0.35)
             ctx.scale(k, k)
-            ctx.translate(-(x + wd / 2), -y)
-            for r, al in ((7, 0.06), (4, 0.08), (2, 0.1)):
-                for j in range(12):
-                    ang = j * math.pi / 6
-                    ctx.set_source_rgba(0, 0, 0, al)
-                    ctx.move_to(x + r * math.cos(ang), y + 2 + r * math.sin(ang))
-                    ctx.show_text(w_["w"])
-            ctx.set_source_rgb(*(ORANGE if active else WHITE))
+            ctx.translate(-(x + wd / 2), -(y - size * 0.35))
+            if active:
+                rounded(ctx, x - 12, y - size * 0.86, wd + 24, size * 1.12, 14)
+                ctx.set_source_rgb(*ORANGE)
+                ctx.fill()
+            else:
+                ctx.move_to(x, y)
+                ctx.text_path(w_["w"])
+                ctx.set_source_rgb(*INK)
+                ctx.set_line_width(11)
+                ctx.set_line_join(cairo.LINE_JOIN_ROUND)
+                ctx.stroke()
             ctx.move_to(x, y)
+            ctx.set_source_rgb(1, 1, 1)
             ctx.show_text(w_["w"])
             ctx.restore()
-            x += wd
+            x += wd + sp
 
     def build_chunks(self):
         ws = [{"w": x["word"].strip(), "s": x["start"] + LEAD, "e": x["end"] + LEAD} for x in self.words]
@@ -842,7 +902,9 @@ class Reel:
         buf = np.ndarray((H, W, 4), np.uint8, s.get_data(), strides=(s.get_stride(), 4, 1))
         f = buf[..., :3].astype(np.float32)
         g = cv2.resize(self.grain[int(t * FPS) % len(self.grain)], (W, H), interpolation=cv2.INTER_LINEAR)[..., None]
-        f = f * (1 - self.vig[..., None]) + g * 5.5
+        lum = f.mean(axis=2, keepdims=True)
+        v = self.vig[..., None] * (1 - np.clip((lum - 215) / 30, 0, 1))
+        f = f * (1 - v) + g * 5.5
         buf[..., :3] = np.clip(f, 0, 255).astype(np.uint8)
         s.mark_dirty()
 
@@ -857,6 +919,12 @@ class Reel:
         self.credit(ctx, t)
         self.caption(ctx, t)
         s.flush()
+        if t < self.Ls[6]:
+            # brand bug: white over photos, ink over the white panels
+            buf = np.ndarray((H, W, 4), np.uint8, s.get_data(), strides=(s.get_stride(), 4, 1))
+            light = buf[96:142, 52:90, :3].mean() > 170
+            self.mark(ctx, 52, 96, 46, dark=light, a=0.95)
+            s.flush()
         self.finish(s, t)
         return s
 
