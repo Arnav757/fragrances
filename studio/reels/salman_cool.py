@@ -98,6 +98,7 @@ class Reel(srk.Reel):
         self.crowd_track = [(x * sc, y * sc) for x, y in cm["track"]][: len(self.crowd)]
         self.crowd_fps = cm["fps"]
         self._mask_cache = {}
+        self.cam_wide = (0.0, 0.0, 1.0)  # placeholder: the base end card wipes up over shot_face_end()
 
     def stripe_wipe(self, ctx, draw_a, draw_b, u, cols=(PURPLE, ORANGE, LIME)):
         cols = tuple(PURPLE if c == COBALT else c for c in cols)
