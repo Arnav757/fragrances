@@ -1,27 +1,33 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ivory: #f6f1e8;
-  --color-paper: #fbf8f2;
-  --color-sand: #ede5d8;
-  --color-line: #e2d8c8;
-  --color-ink: #161514;
-  --color-charcoal: #2a2825;
-  --color-stone: #6b655d;
-  --color-mist: #9a9389;
-  --color-gold: #b39457;
-  --color-gold-deep: #7d6535;
-  --color-gold-soft: #e9dcc0;
-  --color-night: #121110;
-  --color-night-2: #1c1a18;
-  --color-success: #3f6b4a;
-  --color-danger: #9b3b2e;
+  /* Light mode: pure white canvas, ink type, signal orange accent (matches the F. mark). */
+  --color-ivory: #ffffff;
+  --color-paper: #f5f6f8;
+  --color-sand: #e9ebef;
+  --color-line: #e1e4ea;
+  --color-ink: #17191d;
+  --color-charcoal: #2b2e34;
+  --color-stone: #5f636b;
+  --color-mist: #9ca0a8;
+  /* Accent (kept under the `gold` names so shared components stay stable). */
+  --color-gold: #ff4f2a;
+  --color-gold-deep: #c4361a;
+  --color-gold-soft: #ffe4dc;
+  --color-cobalt: #2557ff;
+  --color-lime: #c7ff43;
+  --color-ice: #a5e8ff;
+  --color-night: #17191d;
+  --color-night-2: #22252b;
+  --color-success: #2f6b46;
+  --color-danger: #a3322a;
   --color-warning: #8a6420;
 
-  --font-display: "Cormorant Garamond Variable", "Cormorant Garamond", Georgia, serif;
+  --font-display: "Inter Tight Variable", "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Cormorant Garamond Variable", "Cormorant Garamond", Georgia, serif;
   --font-sans: "Inter Tight Variable", "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  --tracking-luxe: 0.18em;
+  --tracking-luxe: 0.16em;
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -29,12 +35,12 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
   }
   body {
     background: var(--color-ivory);
     color: var(--color-ink);
     font-family: var(--font-sans);
-    font-feature-settings: "ss01", "cv11";
     -webkit-font-smoothing: antialiased;
   }
   ::selection {
@@ -49,8 +55,12 @@
   h2,
   h3 {
     font-family: var(--font-display);
-    font-weight: 500;
-    letter-spacing: -0.01em;
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
   }
   input,
   select,
@@ -64,9 +74,16 @@
   .eyebrow {
     font-family: var(--font-sans);
     font-size: 0.6875rem;
+    font-weight: 500;
     letter-spacing: var(--tracking-luxe);
     text-transform: uppercase;
     color: var(--color-stone);
+  }
+  .serif-accent {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 500;
+    letter-spacing: -0.01em;
   }
   .prose-store {
     color: var(--color-charcoal);
@@ -74,21 +91,27 @@
     font-size: 0.975rem;
   }
   .prose-store h2 {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
     margin: 2.25rem 0 0.75rem;
     color: var(--color-ink);
   }
   .prose-store h3 {
-    font-size: 1.35rem;
+    font-size: 1.2rem;
     margin: 1.75rem 0 0.5rem;
   }
   .prose-store p {
     margin: 0 0 1rem;
   }
-  .prose-store ul {
-    list-style: disc;
+  .prose-store ul,
+  .prose-store ol {
     padding-left: 1.25rem;
     margin: 0 0 1rem;
+  }
+  .prose-store ul {
+    list-style: disc;
+  }
+  .prose-store ol {
+    list-style: decimal;
   }
   .prose-store li {
     margin: 0.35rem 0;
@@ -103,9 +126,14 @@
     font-weight: 600;
   }
   .skeleton {
-    background: linear-gradient(90deg, var(--color-sand) 25%, #f3ece0 37%, var(--color-sand) 63%);
+    background: linear-gradient(90deg, var(--color-sand) 25%, #f1eee7 37%, var(--color-sand) 63%);
     background-size: 400% 100%;
     animation: shimmer 1.4s ease infinite;
+  }
+  .locked {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
   }
 }
 
@@ -118,11 +146,62 @@
   }
 }
 
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-rise {
+  animation: rise 0.6s var(--ease-out-soft) both;
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-break {
+    break-before: page;
+  }
+  a {
+    text-decoration: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Slow orbit for decorative colour dots (sample report hero). */
+@keyframes orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.animate-orbit {
+  animation: orbit 18s linear infinite;
+}
+.animate-orbit-rev {
+  animation: orbit 18s linear infinite reverse;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-orbit,
+  .animate-orbit-rev {
+    animation: none;
   }
 }

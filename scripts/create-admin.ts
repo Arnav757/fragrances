@@ -8,6 +8,7 @@ import { createInterface } from "node:readline/promises";
 import { hash } from "@node-rs/argon2";
 import postgres from "postgres";
 import { loadEnv } from "./load-env";
+import { migrationDbUrl } from "./db-url";
 
 loadEnv();
 
@@ -28,7 +29,9 @@ async function main() {
     console.error("Admin passwords must be at least 12 characters.");
     process.exit(1);
   }
-  const sql = postgres(process.env.DATABASE_URL!, { max: 1, prepare: false });
+  const url = migrationDbUrl();
+  if (!url) throw new Error("DATABASE_URL is not set");
+  const sql = postgres(url, { max: 1, prepare: false });
   const passwordHash = await hash(password, { memoryCost: 19456, timeCost: 2, parallelism: 1 });
   const rows = await sql<{ id: string }[]>`
     insert into profiles (email, password_hash, full_name, role) values (${email.toLowerCase()}, ${passwordHash}, ${name}, 'admin')

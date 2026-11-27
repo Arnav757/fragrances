@@ -1,45 +1,42 @@
 # Deployment guide
 
-The app is a standard Next.js 16 server application. Vercel + Supabase is the simplest path; any Node host (Railway, Render, a VPS with `npm run build && npm start`) works too.
+FORMA is a standard Next.js 16 server application. Vercel + Supabase is the simplest path; any Node host works (`npm run build && npm start`).
 
-## Vercel + Supabase
+## Vercel (no terminal needed)
 
-1. **Database** — set up Supabase and run migrations as in [INTEGRATIONS.md §1](INTEGRATIONS.md). Use the transaction pooler URL.
-2. **Repository** — push this project to GitHub (`.env*` files are git-ignored; keep it that way).
-3. **Import** the repo in Vercel. Framework preset: Next.js. Build command `npm run build`, Node 20+ (22 recommended). Set **Function Region** (Project → Settings → Functions) to the region closest to your Supabase database, e.g. `bom1` for Mumbai.
-   The build needs the environment variables below (at least `DATABASE_URL`, `APP_ENV`, `APP_SECRET`); add them before the first deploy or it will fail.
-4. **Environment variables** (Project → Settings → Environment Variables). For *Production*:
+The `vercel-build` script runs on every Vercel deploy: it applies any new database migrations (safely, under a lock), creates the first admin if you ask it to, then builds. So a deploy is all clicks:
+
+1. **Import** the repo in Vercel: Add New → Project → pick the repository. Framework preset: Next.js (detected). Node 22.
+2. **Database** — in the project, Storage → Create/Connect → **Supabase** (or Neon). Pick a region close to your users (Mumbai `ap-south-1` for India). Vercel adds the connection variables automatically; the app reads `DATABASE_URL` or, for Supabase, `POSTGRES_URL` / `POSTGRES_URL_NON_POOLING`.
+3. **Environment variables** (Settings → Environment Variables):
 
    | Variable | Value |
    |---|---|
-   | `DATABASE_URL` | Supabase pooler URI |
-   | `APP_ENV` | `production` |
-   | `SITE_URL` | `https://www.yourdomain.in` |
-   | `APP_SECRET` | `openssl rand -base64 48` (keep it stable — changing it invalidates guest order links) |
+   | `APP_SECRET` | `openssl rand -base64 48` — keep it stable: it encrypts stored report links |
    | `CRON_SECRET` | another random value |
-   | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | live keys only when going live |
-   | `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | |
-   | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | |
+   | `SITE_URL` | your site URL, e.g. `https://forma.vercel.app` (no trailing slash) |
+   | `APP_ENV` | `staging` for a test site, `production` for real customers |
+   | `ENABLE_MOCK_PAYMENTS` | `true` **only** for a staging/test site (refused in production) |
+   | `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` | your studio login (password 12+ characters). Used once, only if no admin exists; never changes an existing account. Remove after first sign-in. |
+   | `ANTHROPIC_API_KEY` | optional — enables photo analysis |
+   | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | required for real payments |
+   | `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | required to actually send report links |
+   | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PHOTO_BUCKET` | private photo storage (required in production) |
 
-   Do **not** set `ENABLE_MOCK_PAYMENTS` in production — the app refuses to start with it. For a *Preview/Staging* environment use `APP_ENV=staging`, Razorpay **test** keys and a separate database.
-5. **Cron** — `vercel.json` (already in the repo) schedules `/api/cron/expire-orders` once a day, which is the most often the Hobby plan allows. Stale unpaid orders are also expired whenever an admin opens **Admin → Overview**. On Pro you can make it hourly by changing the schedule to `"0 * * * *"`.
-   Vercel sends `Authorization: Bearer $CRON_SECRET` automatically when `CRON_SECRET` is set.
-6. **Domain** — add your domain in Vercel, then set `SITE_URL` to it and redeploy.
-7. **Razorpay webhook** — point it at `https://<domain>/api/webhooks/razorpay`.
-8. **Smoke test** — `GET /api/health` returns `{"ok":true}`; place a Razorpay *test-mode* order on staging end-to-end before switching production to live keys.
+4. **Deploy** (Deployments → Redeploy if the first build ran before the variables were set). The build log shows `migrations applied: …` and `bootstrap admin: created …`.
+5. Sign in at `/login`, then remove the `BOOTSTRAP_ADMIN_*` variables.
+
+Use separate databases for preview and production deployments: migrations run against whichever database a deployment's variables point to.
+
+### Remaining production setup
+
+- **Private photo bucket** — Supabase → Storage → New bucket `client-photos`, **Public: off**. The app only ever reads it with the service-role key on the server. In production, photos are never stored on local disk.
+- **Function duration** — photo analysis runs inside a server action capped at 45 s (falls back to quiz answers after that); `/start` sets `maxDuration = 60`, which the free Vercel plan allows.
+- **Cron** — `vercel.json` runs `/api/cron/retention` daily (photo deletion, unpaid-preview cleanup, checkout expiry). Vercel sends `Authorization: Bearer $CRON_SECRET` automatically.
+- **Razorpay webhook** — `https://<domain>/api/webhooks/razorpay` with events `payment.captured`, `payment.failed`, `order.paid`, `refund.processed`, `refund.failed`.
+- **Stylist accounts** — `ADMIN_PASSWORD='…' npm run admin:create -- stylist@… "Name"`, then `update profiles set role = 'stylist' where email = '…'` (stylists review and release; they can't refund or change settings).
+- **Smoke test** — `GET /api/health` → `{"ok":true}`; run a Razorpay test-mode purchase on staging, and `npm run test:e2e` against staging with simulated payments.
 
 ## Other hosts
 
-```bash
-npm ci
-npm run build
-APP_ENV=production node_modules/.bin/next start -p 3000
-```
-Run behind HTTPS (cookies are `Secure` in production). If the proxy terminates TLS, forward `X-Forwarded-For`/`X-Forwarded-Host` and set `X-Real-IP` to the client address (rate limiting uses `X-Real-IP`, else the last `X-Forwarded-For` entry, because the first entry can be forged by the client). Product image uploads require Supabase Storage on any host without a persistent disk.
-
-## Backups and operations
-
-- Enable Supabase point-in-time recovery or daily backups. Orders, payments and audit logs are your accounting trail.
-- Export orders monthly (Admin → Orders → Export CSV) for your accountant.
-- Watch **Admin → Overview** warnings and **Email log** failures.
-- Rotate `RAZORPAY_*`, `RESEND_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` if anyone with access leaves.
+Any Node host works: set the same variables, run `npm run db:migrate` (and optionally `npm run db:bootstrap-admin`) on deploy, then `npm run build && npm start`.

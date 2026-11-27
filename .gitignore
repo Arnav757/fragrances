@@ -44,3 +44,10 @@ next-env.d.ts
 /public/uploads/
 /scripts/.shot.mjs
 /test-results/
+
+# local private photo storage
+/.data
+
+# content studio renders and assets
+/studio/work/
+__pycache__/

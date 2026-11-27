@@ -1,71 +1,104 @@
 import "server-only";
-import { mkdir, writeFile, unlink } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { env } from "./env";
 import { randomToken } from "./auth/crypto";
 
-export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+export const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 
 /** Detect the real image type from magic bytes — never trust the browser-supplied MIME type or extension. */
-export function sniffImageType(buf: Uint8Array): { mime: string; ext: string } | null {
+export function sniffImageType(buf: Uint8Array): { mime: "image/jpeg" | "image/png" | "image/webp"; ext: string } | null {
   if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return { mime: "image/jpeg", ext: "jpg" };
   if (buf.length >= 8 && [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((b, i) => buf[i] === b)) return { mime: "image/png", ext: "png" };
-  if (
-    buf.length >= 12 &&
-    String.fromCharCode(...buf.slice(0, 4)) === "RIFF" &&
-    String.fromCharCode(...buf.slice(8, 12)) === "WEBP"
-  )
+  if (buf.length >= 12 && String.fromCharCode(...buf.slice(0, 4)) === "RIFF" && String.fromCharCode(...buf.slice(8, 12)) === "WEBP")
     return { mime: "image/webp", ext: "webp" };
-  if (buf.length >= 12 && String.fromCharCode(...buf.slice(4, 12)) === "ftypavif") return { mime: "image/avif", ext: "avif" };
   return null;
 }
 
 export class UploadError extends Error {}
 
-export async function storeProductImage(file: File): Promise<{ url: string; storagePath: string }> {
-  if (file.size === 0) throw new UploadError("The file is empty.");
-  if (file.size > MAX_UPLOAD_BYTES) throw new UploadError("Images must be 5 MB or smaller.");
-  const buf = new Uint8Array(await file.arrayBuffer());
-  const type = sniffImageType(buf);
-  if (!type) throw new UploadError("Only JPEG, PNG, WebP or AVIF images are allowed.");
-  const name = `products/${new Date().toISOString().slice(0, 7)}/${randomToken(12).replace(/[^A-Za-z0-9]/g, "")}.${type.ext}`;
+export type StoredPhoto = { path: string; mime: "image/jpeg" | "image/png" | "image/webp"; bytes: Uint8Array };
+
+/** Local fallback directory. Deliberately outside `public/`, so photos are never served statically. */
+const LOCAL_DIR = () => path.join(process.cwd(), ".data", "photos");
+
+/**
+ * Validates and stores a customer photo in PRIVATE storage. Photos are only ever read back through
+ * server code (the AI analysis and the staff-only photo route), never by public URL.
+ */
+export async function storePhoto(file: File): Promise<StoredPhoto> {
+  if (file.size === 0) throw new UploadError("The photo is empty.");
+  if (file.size > MAX_PHOTO_BYTES) throw new UploadError("Photos must be 8 MB or smaller.");
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const type = sniffImageType(bytes);
+  if (!type) throw new UploadError("Please upload a JPEG, PNG or WebP photo.");
+  const name = `${new Date().toISOString().slice(0, 7)}/${randomToken(18).replace(/[^A-Za-z0-9]/g, "")}.${type.ext}`;
 
   const e = env();
   if (e.SUPABASE_URL && e.SUPABASE_SERVICE_ROLE_KEY) {
-    const res = await fetch(`${e.SUPABASE_URL}/storage/v1/object/${e.SUPABASE_STORAGE_BUCKET}/${name}`, {
+    const res = await fetch(`${e.SUPABASE_URL}/storage/v1/object/${e.SUPABASE_PHOTO_BUCKET}/${name}`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${e.SUPABASE_SERVICE_ROLE_KEY}`,
-        "Content-Type": type.mime,
-        "x-upsert": "false",
-        "cache-control": "31536000",
-      },
-      body: buf,
+      headers: { Authorization: `Bearer ${e.SUPABASE_SERVICE_ROLE_KEY}`, "Content-Type": type.mime, "x-upsert": "false" },
+      body: bytes,
       signal: AbortSignal.timeout(20000),
     });
-    if (!res.ok) throw new UploadError(`Upload to storage failed (${res.status}).`);
-    return { url: `${e.SUPABASE_URL}/storage/v1/object/public/${e.SUPABASE_STORAGE_BUCKET}/${name}`, storagePath: `supabase:${name}` };
+    if (!res.ok) throw new UploadError(`Photo upload failed (${res.status}). Please try again.`);
+    return { path: `supabase:${name}`, mime: type.mime, bytes };
   }
-
-  // Local development fallback: files are written under public/uploads (not suitable for serverless hosting).
-  const dest = path.join(process.cwd(), "public", "uploads", name);
+  if (e.APP_ENV === "production") throw new UploadError("Photo storage is not configured.");
+  const dest = path.join(LOCAL_DIR(), name);
   await mkdir(path.dirname(dest), { recursive: true });
-  await writeFile(dest, buf);
-  return { url: `/uploads/${name}`, storagePath: `local:${name}` };
+  await writeFile(dest, bytes);
+  return { path: `local:${name}`, mime: type.mime, bytes };
 }
 
-export async function deleteStoredImage(storagePath: string | null) {
+function safeName(p: string, prefix: string): string | null {
+  const name = p.slice(prefix.length);
+  return /^[0-9]{4}-[0-9]{2}\/[A-Za-z0-9]+\.(jpg|png|webp)$/.test(name) ? name : null;
+}
+
+export async function readPhoto(storagePath: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
+  const e = env();
+  if (storagePath.startsWith("supabase:")) {
+    const name = safeName(storagePath, "supabase:");
+    if (!name || !e.SUPABASE_URL || !e.SUPABASE_SERVICE_ROLE_KEY) return null;
+    const res = await fetch(`${e.SUPABASE_URL}/storage/v1/object/authenticated/${e.SUPABASE_PHOTO_BUCKET}/${name}`, {
+      headers: { Authorization: `Bearer ${e.SUPABASE_SERVICE_ROLE_KEY}` },
+      signal: AbortSignal.timeout(20000),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    return { bytes, mime: sniffImageType(bytes)?.mime ?? "application/octet-stream" };
+  }
+  if (storagePath.startsWith("local:")) {
+    const name = safeName(storagePath, "local:");
+    if (!name) return null;
+    try {
+      const bytes = new Uint8Array(await readFile(path.join(LOCAL_DIR(), name)));
+      return { bytes, mime: sniffImageType(bytes)?.mime ?? "application/octet-stream" };
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+export async function deletePhoto(storagePath: string | null): Promise<void> {
   if (!storagePath) return;
   const e = env();
   if (storagePath.startsWith("supabase:") && e.SUPABASE_URL && e.SUPABASE_SERVICE_ROLE_KEY) {
-    const name = storagePath.slice("supabase:".length);
-    await fetch(`${e.SUPABASE_URL}/storage/v1/object/${e.SUPABASE_STORAGE_BUCKET}`, {
+    const name = safeName(storagePath, "supabase:");
+    if (!name) return;
+    const res = await fetch(`${e.SUPABASE_URL}/storage/v1/object/${e.SUPABASE_PHOTO_BUCKET}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${e.SUPABASE_SERVICE_ROLE_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({ prefixes: [name] }),
-    }).catch(() => {});
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) throw new Error(`Photo deletion failed (${res.status})`);
   } else if (storagePath.startsWith("local:")) {
-    const name = storagePath.slice("local:".length);
-    if (!name.includes("..")) await unlink(path.join(process.cwd(), "public", "uploads", name)).catch(() => {});
+    const name = safeName(storagePath, "local:");
+    if (name) await unlink(path.join(LOCAL_DIR(), name)).catch(() => {});
   }
 }

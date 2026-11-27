@@ -1,0 +1,5 @@
+# Natural narration (large: pulls in PyTorch). Python 3.11.
+torch==2.6.0
+torchaudio==2.6.0
+chatterbox-tts
+setuptools<81

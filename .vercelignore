@@ -1,0 +1,7 @@
+# Never upload local secrets, customer photos or content-studio renders
+.env*
+!.env.example
+.data
+studio/work
+node_modules
+.next

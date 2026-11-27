@@ -1,185 +1,74 @@
 /**
- * End-to-end test: guest purchase in test mode → admin supplier fulfilment → delivered.
- *
- * Requirements: the app running at E2E_BASE_URL (default http://localhost:3000) with ENABLE_MOCK_PAYMENTS=true
- * (or Razorpay test keys — not automated here), the demo seed loaded, and an admin account whose
- * credentials are in E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD.
- *
- * Browser: uses CHROMIUM_PATH, a Playwright-installed Chromium, or @sparticuz/chromium as a fallback.
- * Run: npm run test:e2e   (screenshots go to E2E_SHOTS_DIR when set)
+ * End-to-end check against a running app: quiz → free preview → simulated payment → stylist release.
+ * Needs: the app running with ENABLE_MOCK_PAYMENTS=true, and a staff account.
+ *   E2E_BASE_URL=http://localhost:3000 E2E_ADMIN_EMAIL=... E2E_ADMIN_PASSWORD=... npm run test:e2e
+ * Uses the preinstalled Chromium when PW_CHROMIUM is set (e.g. /opt/pw-browsers/chromium).
  */
-import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { chromium } from "playwright-core";
+import { chromium } from "playwright";
 
-const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3000";
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@example.com";
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD;
-const SHOTS = process.env.E2E_SHOTS_DIR;
-if (!ADMIN_PASSWORD) throw new Error("Set E2E_ADMIN_PASSWORD");
-if (SHOTS) mkdirSync(SHOTS, { recursive: true });
-
-async function launch() {
-  if (process.env.CHROMIUM_PATH) return chromium.launch({ executablePath: process.env.CHROMIUM_PATH });
-  try {
-    return await chromium.launch();
-  } catch {
-    const sparticuz = (await import("@sparticuz/chromium")).default;
-    return chromium.launch({ executablePath: await sparticuz.executablePath(), args: sparticuz.args });
-  }
+const B = process.env.E2E_BASE_URL ?? "http://localhost:3000";
+const ADMIN = process.env.E2E_ADMIN_EMAIL;
+const PASS = process.env.E2E_ADMIN_PASSWORD;
+if (!ADMIN || !PASS) {
+  console.error("Set E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD.");
+  process.exit(1);
 }
 
-const shot = async (page, name) => SHOTS && page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
-const step = (name) => console.log(`• ${name}`);
-
-const browser = await launch();
-let adminBrowser = null;
+const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
+const errors = [];
 try {
-  // ---------------------------------------------------------------- customer
-  const customer = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-  const page = await customer.newPage();
-  page.setDefaultTimeout(30000);
+  const page = await browser.newPage();
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto(`${B}/start?utm_source=e2e`);
+  const next = () => page.getByTestId("next").click();
+  await page.getByLabel("First name").fill("Ekam");
+  await page.getByRole("radio", { name: "25–34" }).click(); await next();
+  await page.getByRole("radio", { name: "Athletic" }).click(); await next();
+  await page.getByRole("radio", { name: /clearly wider/ }).click();
+  await page.getByRole("radio", { name: "Flat" }).click(); await next();
+  await next();
+  await page.getByRole("radio", { name: /green or olive/ }).click();
+  await page.getByRole("radio", { name: /tan easily/ }).click();
+  await page.getByRole("radio", { name: /Gold looks better/ }).click(); await next();
+  await page.getByRole("radio", { name: /Medium/ }).click();
+  await page.getByRole("radio", { name: "Black", exact: true }).click(); await next();
+  await page.getByRole("radio", { name: "Oval" }).click();
+  await page.getByRole("radio", { name: "Stubble" }).click(); await next();
+  await page.getByRole("button", { name: "Weekends & casual" }).click();
+  await page.getByRole("radio", { name: /Minimal/ }).click(); await next();
+  await page.getByRole("radio", { name: /^Value/ }).click(); await next();
+  await page.getByTestId("submit-quiz").click();
+  await page.waitForURL(/\/s\//, { timeout: 60000 });
+  console.log("✓ preview", page.url());
 
-  step("browse and filter the shop");
-  await page.goto(`${BASE}/shop?type=inspired_fragrance&available=1`);
-  const cards = page.locator("article");
-  assert.ok((await cards.count()) > 0, "expected inspired, available products");
-
-  step("search by note");
-  await page.goto(`${BASE}/shop?q=saffron`);
-  await page.getByRole("link", { name: /Saffron Leather/ }).first().click();
-  await page.waitForURL(/\/products\//);
-  await shot(page, "01-product");
-
-  step("add to cart");
-  await page.getByRole("button", { name: "Add to cart" }).click();
-  await page.getByText("Added to your cart").waitFor();
-  await page.goto(`${BASE}/cart`);
-  await page.getByRole("heading", { name: "Your cart" }).waitFor();
-
-  step("apply demo discount code");
-  await page.getByLabel("Discount code").fill("DEMO10");
-  await page.getByRole("button", { name: "Apply" }).click();
-  await page.getByText(/Code DEMO10 applied|DEMO10/).first().waitFor();
-  await shot(page, "02-cart");
-
-  step("checkout as guest");
-  await page.getByRole("link", { name: "Checkout" }).click();
-  await page.waitForURL(/\/checkout$/);
-  await page.getByLabel("Email").fill("e2e.customer@example.com");
-  await page.getByLabel("Your name").fill("Asha Verma");
+  await page.locator("#contactName").fill("E2E Buyer");
+  await page.locator("#email").fill("e2e@example.com");
   await page.locator("#phone").fill("9876543210");
-  await page.locator("#shipping-fullName").fill("Asha Verma");
-  await page.locator("#shipping-phone").fill("9876543210");
-  await page.locator("#shipping-line1").fill("12, Lavender Residency, MG Road");
-  await page.locator("#shipping-pincode").fill("560001");
-  await page.locator("#shipping-city").fill("Bengaluru");
-  await page.locator("#shipping-state").selectOption("Karnataka");
-  await page.locator("#acceptTerms").check();
-  await shot(page, "03-checkout");
-  await page.getByRole("button", { name: /Continue to payment/ }).click();
-  await page.waitForURL(/\/checkout\/pay\//);
-  const orderNumber = page.url().match(/pay\/(NN-\d+)/)?.[1];
-  assert.ok(orderNumber, "order number in URL");
-  await shot(page, "04-pay");
-
-  step("simulated payment failure, then retry");
-  await page.getByRole("button", { name: "Simulate failure" }).click();
-  await page.getByText(/simulated payment failed/i).waitFor();
+  await page.getByText(/I agree to the/).click();
+  await page.getByTestId("pay").click();
   await page.getByTestId("simulate-success").click();
-  await page.waitForURL(/\/order\/NN-/);
-  await page.getByRole("heading", { name: "Thank you for your order" }).waitFor();
-  await shot(page, "05-confirmation");
-  const guestOrderUrl = page.url();
+  await page.waitForSelector("text=Stylist review in progress", { timeout: 30000 });
+  console.log("✓ paid, full report unlocked");
 
-  step("cart is cleared after payment");
-  await page.goto(`${BASE}/cart`);
-  await page.getByText("Your cart is empty").waitFor();
-
-  step("a stranger cannot open the order without the token");
-  const noToken = await fetch(`${BASE}/order/${orderNumber}`);
-  assert.equal(noToken.status, 404, "order page without token must 404");
-  const badToken = await fetch(`${BASE}/order/${orderNumber}?t=${"0".repeat(40)}`);
-  assert.equal(badToken.status, 404, "order page with wrong token must 404");
-  const anonAdmin = await fetch(`${BASE}/admin`, { redirect: "manual" });
-  assert.ok([302, 303, 307, 308].includes(anonAdmin.status) && anonAdmin.headers.get("location")?.includes("/login"), "admin redirects anonymous users to login");
-
-  // ---------------------------------------------------------------- admin
-  // A separate browser process for the admin (some headless builds share cookies between contexts).
-  adminBrowser = await launch();
-  const adminCtx = await adminBrowser.newContext({ viewport: { width: 1440, height: 1000 } });
-  const admin = await adminCtx.newPage();
-  admin.setDefaultTimeout(30000);
-  step("admin signs in");
-  await admin.goto(`${BASE}/login?next=/admin`);
-  await admin.getByLabel("Email").fill(ADMIN_EMAIL);
-  await admin.getByLabel("Password").fill(ADMIN_PASSWORD);
-  await admin.getByRole("button", { name: "Sign in" }).click();
-  await admin.waitForURL((u) => new URL(u).pathname === "/admin");
-  await shot(admin, "06-admin-overview");
-
-  step("open the order");
-  await admin.goto(`${BASE}/admin/orders?q=${orderNumber}`);
-  await admin.getByRole("link", { name: orderNumber }).click();
-  await admin.waitForURL(/\/admin\/orders\/[0-9a-f-]+$/);
-  const adminOrderUrl = admin.url();
-  await admin.getByText("Confirmed", { exact: true }).first().waitFor();
-
-  step("record supplier purchase (draft)");
-  await admin.getByRole("button", { name: "Record supplier purchase" }).click();
-  await admin.getByText("Supplier purchase recorded as draft.").waitFor();
-
-  step("show and copy supplier message; contains address, no email");
-  await admin.getByRole("button", { name: "Show supplier message" }).click();
-  const msg = await admin.getByLabel("Supplier message").inputValue();
-  assert.match(msg, /Lavender Residency/);
-  assert.match(msg, /PREPAID/);
-  assert.doesNotMatch(msg, /e2e\.customer@example\.com/, "supplier message must not include customer email");
-
-  step("mark ordered requires explicit confirmation");
-  const orderedBtn = admin.getByRole("button", { name: "Mark as ordered" });
-  assert.equal(await orderedBtn.isDisabled(), true);
-  await admin.getByText(/I confirm I have placed this order/).click();
-  await orderedBtn.click();
-  await admin.getByText("Marked as ordered with supplier.").waitFor();
-
-  step("supplier confirms, then ship with tracking");
-  await admin.getByRole("button", { name: "Supplier confirmed availability" }).click();
-  await admin.getByText("Supplier confirmation recorded.").waitFor();
-  await admin.getByLabel("Courier").fill("Delhivery");
-  await admin.getByLabel("Tracking number").fill("DLV123456789");
-  await admin.getByRole("button", { name: "Mark shipped" }).click();
-  await admin.getByText("Shipment recorded.").waitFor();
-  await shot(admin, "07-admin-order-shipped");
-
-  step("mark delivered");
-  await admin.locator("#status-to").selectOption("delivered");
-  await admin.getByRole("button", { name: "Update status" }).click();
-  await admin.getByText("Status updated.").waitFor();
-  await admin.goto(adminOrderUrl);
-  await admin.getByText("Delivered", { exact: true }).first().waitFor();
-
-  step("emails were generated (logged) for payment, dispatch and delivery");
-  await admin.goto(`${BASE}/admin/emails`);
-  for (const t of ["payment_confirmation", "order_dispatched", "delivered"]) {
-    assert.ok((await admin.getByRole("cell", { name: t }).count()) > 0, `email ${t} logged`);
-  }
-
-  step("customer sees tracking on their order page");
-  await page.goto(guestOrderUrl);
-  await page.getByText("DLV123456789").first().waitFor();
-  await shot(page, "08-customer-delivered");
-
-  step("financial report renders");
-  await admin.goto(`${BASE}/admin/reports`);
-  await admin.getByRole("cell", { name: /^Estimated contribution/ }).waitFor();
-  await shot(admin, "09-report");
-
-  console.log(`\nE2E passed for order ${orderNumber}`);
-} catch (e) {
-  if (SHOTS) for (const [i, pg] of [browser, adminBrowser].filter(Boolean).flatMap((b) => b.contexts()).flatMap((c) => c.pages()).entries()) await pg.screenshot({ path: `${SHOTS}/failure-${i}.png`, fullPage: true }).catch(() => {});
-  throw e;
+  const staff = await browser.newPage();
+  staff.on("dialog", (d) => d.accept());
+  await staff.goto(`${B}/login`);
+  await staff.getByLabel("Email").fill(ADMIN);
+  await staff.getByLabel("Password").fill(PASS);
+  await staff.getByRole("button", { name: "Sign in" }).click();
+  await staff.waitForURL(`${B}/admin`);
+  await staff.goto(`${B}/admin/reports?q=e2e@example.com&status=queue`);
+  await staff.getByRole("link", { name: /^FM-/ }).first().click();
+  await staff.getByLabel(/Personal note/).fill("E2E note.");
+  await staff.getByRole("button", { name: "Save note" }).click();
+  await staff.waitForSelector("text=Note saved");
+  await staff.getByTestId("release").click();
+  await staff.waitForSelector("text=Released");
+  await page.reload();
+  await page.waitForSelector("text=Stylist reviewed");
+  console.log("✓ released and visible to the customer");
+  if (errors.length) throw new Error("Browser errors: " + errors.join("; "));
+  console.log("E2E passed");
 } finally {
   await browser.close();
-  await adminBrowser?.close();
 }
