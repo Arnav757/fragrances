@@ -184,15 +184,23 @@ class Reel(sc.Reel):
             age = t - t_nawab
             if age > 0.1:
                 d = e_back(prog(age, 0.1, 0.45), 2.6)
-                self.crown(ctx, W / 2 + 175, 548 - lerp(220, 0, d), 100, a=clamp((age - 0.1) / 0.1), rgb=GOLD)
+                ctx.select_font_face(DISPLAY)
+                ctx.set_font_size(112)
+                bw = ctx.text_extents("NAWAB.").x_advance + 2 * 5 + 60
+                self.crown(ctx, W / 2 + bw / 2 + 80, 600 - lerp(260, 0, d), 110, a=clamp((age - 0.1) / 0.1), rgb=GOLD)
                 self.event("crown lands", t_nawab + 0.35)
         else:
             k = t - t_some + 0.05
             self.vid(ctx, "carwalk", k + 0.15, speed=0.75, zoom=lerp(1.18, 1.04, e_out(prog(k, 0, 0.6))))
             self.flash(ctx, k, 0.1, 0.5)
-            self.grad_top(ctx, 700, 0.5)
+            g = cairo.LinearGradient(0, 900, 0, 1500)
+            g.add_color_stop_rgba(0, 0, 0, 0, 0)
+            g.add_color_stop_rgba(1, 0, 0, 0, 0.5)
+            ctx.set_source(g)
+            ctx.rectangle(0, 900, W, 1020)
+            ctx.fill()
             self.headline(ctx, [("AND THAT'S", t_some + 0.05, WHITE), ("THE BORING PART.", self._first(["least", "interesting"], 0), ORANGE)],
-                          t, y0=330, size=96, step=134)
+                          t, y0=1180, size=96, step=134)
             self.event("cut → steps out", t_some)
 
     # WHO — name behind him, the family, the title
@@ -431,14 +439,14 @@ class Reel(sc.Reel):
         t_white = self.t_(["White", "shirts"], 5, t_dr + 0.9)
         t_flare = self.t_(["flared", "denim"], 5, t_white + 0.9)
         t_linen = self.t_(["linen", "suit"], 5, t_flare + 0.9)
-        t_no = self.t_(["no", "shoes"], 5, t_linen + 1.0)
+        t_no = self.t_(["double"], 5, t_linen + 1.0)
         t_old = self.t_(["Old", "money"], 5, s1 - 1.8)
         if t < t_white - 0.05:
             self.vid(ctx, "walk", (t - s0) * 0.7, speed=1.0, zoom=1.08)
             self.section_title(ctx, "", "THE DRESSING", t, s0 + 0.05, dur=max(0.6, t_white - s0 - 0.4), kicker="AND FINALLY")
             return
         shots = [("01", t_white, "WHITE SHIRT", WHITE), ("08", t_flare, "FLARED DENIM", PURPLE), ("suit", t_linen, "LINEN SUIT", GOLD),
-                 ("airport", t_no, "NO SHOES.", ORANGE), ("02", t_old, "OLD MONEY", GOLD)]
+                 ("airport", t_no, "DOUBLE DENIM", COBALT), ("02", t_old, "OLD MONEY", GOLD)]
         cur = 0
         for i, sh in enumerate(shots):
             if t >= sh[1] - 0.05:
@@ -451,12 +459,9 @@ class Reel(sc.Reel):
             kname = shots[which][0]
             if kname in self.v:
                 if kname == "airport":
-                    # bare feet: tight on the feet, then pull back to the whole walk
-                    v = self.v["airport"]
-                    i = v.at(kk * 0.9, 1.0)
-                    fx, fy = v.track[i]
-                    z = lerp(2.3, 1.0, e_io(prog(kk, 0.55, 0.7)))
-                    self.vid(ctx, "airport", kk * 0.9, speed=1.0, zoom=z, oy=(1 - (z - 1) / 1.3) * 0 - (z - 1) * 520)
+                    # double denim: tight on the denim shirt, then pull back to shirt + jeans + boots
+                    z = lerp(1.22, 1.0, e_out(prog(kk, 0.0, 0.9)))
+                    self.vid(ctx, "airport", 1.6 + kk * 0.8, speed=1.0, zoom=z)
                 else:
                     self.vid(ctx, kname, kk * 0.7, speed=1.0, zoom=1.05)
             else:
@@ -475,18 +480,11 @@ class Reel(sc.Reel):
             ph = self.ph["08"]
             pt = self.to_canvas((ph.w * 0.42, ph.h * 0.9), cam)
             self.arrow_label(ctx, pt, (W - 140, pt[1] - 300), "THE FLARE", k - 0.25, bg=GOLD, fg=INK, anchor="r")
-        if key == "airport" and k < 0.9:
-            ctx.set_source_rgba(*ORANGE, clamp(k / 0.15) * (1 - prog(k, 0.6, 0.3)))
-            ctx.set_line_width(7)
-            ctx.set_dash((4, 12), -k * 60)
-            ctx.arc(W / 2, 1450, 260, 0, 2 * math.pi)
-            ctx.stroke()
-            ctx.set_dash(())
         self.pill(ctx, lab, W / 2, 300, k - 0.08, rgb_bg=col, rgb_fg=INK if col in (WHITE, GOLD) else WHITE, size=44)
         self.text(ctx, f"FIT {cur + 1:02d}/05", W - 60, 230, 26, font=MONO, align="r", a=0.85, track=2)
         if key == "airport":
             self.stamp(ctx, "AT THE AIRPORT", W / 2, 1150, k - 0.5, rgb=WHITE, size=56, rot=-5)
-            self.event("bare feet", st)
+            self.event("double denim", st)
         if key == "02":
             self.stamp(ctx, "NEVER TRIES TOO HARD", W / 2, 1330, t - (self._first(["never", "tries"], 5) or st + 0.6), rgb=GOLD, size=50, rot=-4)
 
